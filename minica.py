@@ -6,6 +6,6 @@ Simple local X.509 certificate management.
 """
 
 def main():
-    pass
+    raise NotImplementedError
 
 if __name__ == '__main__': main()
