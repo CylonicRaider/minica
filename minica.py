@@ -45,13 +45,13 @@ class OpenSSLDriver:
     def __init__(self):
         self.openssl_path = OPENSSL_PATH
 
-    def _run_openssl(self, args, input):
+    def _run_openssl(self, args, input=None):
         proc = subprocess.Popen((self.openssl_path,) + tuple(args),
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
-        stdin, stdout = proc.communicate(input)
+        stdout, stderr = proc.communicate(input)
         status = proc.wait()
-        return {'status': status, 'stdin': stdin, 'stdout': stdout}
+        return {'status': status, 'stdout': stdout, 'stderr': stderr}
 
 def main():
     raise NotImplementedError
