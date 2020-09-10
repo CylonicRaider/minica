@@ -5,6 +5,8 @@
 Simple local X.509 certificate management.
 """
 
+import os
+import stat
 import subprocess
 
 OPENSSL_PATH = '/usr/bin/openssl'
@@ -42,7 +44,8 @@ def split_pem_objects(lines):
     return output
 
 class OpenSSLDriver:
-    def __init__(self):
+    def __init__(self, storage_dir):
+        self.storage_dir = storage_dir
         self.openssl_path = OPENSSL_PATH
 
     def _run_openssl(self, args, input=None):
@@ -52,6 +55,22 @@ class OpenSSLDriver:
         stdout, stderr = proc.communicate(input)
         status = proc.wait()
         return {'status': status, 'stdout': stdout, 'stderr': stderr}
+
+    def _silent_remove(self, path):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+    def prepare_storage(self):
+        os.makedirs(self.storage_dir)
+        os.chmod(self.storage_dir, 0o755)
+        key_dir = os.path.join(self.storage_dir, 'key')
+        os.mkdir(key_dir)
+        os.chmod(key_dir, 0o700)
+        cert_dir = os.path.join(self.storage_dir, 'cert')
+        os.mkdir(cert_dir)
+        os.chmod(cert_dir, 0o755)
 
 def main():
     raise NotImplementedError
