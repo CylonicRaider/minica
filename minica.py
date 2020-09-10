@@ -28,6 +28,9 @@ def split_pem_objects(lines):
             elif not cur_accum:
                 raise ValueError('Unexpected post-encapsulation boundary on '
                                  'line ' + str(n))
+            elif line[9:-5] != cur_accum[0]:
+                raise ValueError('Post-encapsulation boundary on line ' +
+                    str(n) + ' does not match pre-encapsulation boundary')
             output.append((cur_accum[0], '\n'.join(cur_accum[1])))
             cur_accum = None
         elif line.startswith('-----'):
