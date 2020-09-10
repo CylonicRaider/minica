@@ -5,11 +5,15 @@
 Simple local X.509 certificate management.
 """
 
-import os
+import os, re
 import stat
 import subprocess
 
+VALID_NAME = re.compile('^[a-zA-Z0-9._-]+$')
+
 OPENSSL_PATH = '/usr/bin/openssl'
+DEFAULT_NEW_KEY_SPEC = 'rsa:4096'
+DEFAULT_NEW_CERT_VALIDITY = 30 # days
 
 def split_pem_objects(lines):
     output = []
@@ -47,6 +51,8 @@ class OpenSSLDriver:
     def __init__(self, storage_dir):
         self.storage_dir = storage_dir
         self.openssl_path = OPENSSL_PATH
+        self.new_key_spec = DEFAULT_NEW_KEY_SPEC
+        self.new_cert_validity = DEFAULT_NEW_CERT_VALIDITY
 
     def _run_openssl(self, args, input=None):
         proc = subprocess.Popen((self.openssl_path,) + tuple(args),
@@ -71,6 +77,39 @@ class OpenSSLDriver:
         cert_dir = os.path.join(self.storage_dir, 'cert')
         os.mkdir(cert_dir)
         os.chmod(cert_dir, 0o755)
+
+    def _create_cert(self, cmdline, key_path, cert_path):
+        res = None
+        try:
+            res = self._run_openssl(cmdline)
+        finally:
+            if not res or res['status'] != 0:
+                if key_path: self._silent_remove(key_path)
+                if cert_path: self._silent_remove(cert_path)
+        if res['status'] != 0:
+            return {'status': 'FAIL', 'detail': res['stderr']}
+        ret = {'status': 'OK'}
+        if key_path: ret['key_path'] = key_path
+        if cert_path: ret['cert_path'] = cert_path
+        return ret
+
+    def create_root(self, basename):
+        if not VALID_NAME.match(basename):
+            raise ValueError('Invalid certificate basename')
+        key_path = os.path.join(self.storage_dir, 'key', basename + '.pem')
+        cert_path = os.path.join(self.storage_dir, 'cert', basename + '.pem')
+        return self._create_cert((
+            # Generate self-signed certificate.
+            'req', '-x509',
+            # Unencrypted private key.
+            '-nodes',
+            # Generate a new key.
+            '-newkey', self.new_key_spec,
+            # Do not prompt for a subject.
+            '-subj', '/O=Local/CN=' + basename,
+            # Write certificate and key to files.
+            '-keyout', key_path, '-out', cert_path
+        ), key_path, cert_path)
 
 def main():
     raise NotImplementedError
