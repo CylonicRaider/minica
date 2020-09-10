@@ -12,7 +12,9 @@ import subprocess
 VALID_NAME = re.compile('^[a-zA-Z0-9._-]+$')
 
 OPENSSL_PATH = '/usr/bin/openssl'
+
 DEFAULT_NEW_KEY_SPEC = 'rsa:4096'
+DEFAULT_NEW_CERT_FINGERPRINT = 'sha256'
 DEFAULT_NEW_CERT_VALIDITY = 30 # days
 
 def split_pem_objects(lines):
@@ -52,6 +54,7 @@ class OpenSSLDriver:
         self.storage_dir = storage_dir
         self.openssl_path = OPENSSL_PATH
         self.new_key_spec = DEFAULT_NEW_KEY_SPEC
+        self.new_cert_fingerprint = DEFAULT_NEW_CERT_FINGERPRINT
         self.new_cert_validity = DEFAULT_NEW_CERT_VALIDITY
 
     def _run_openssl(self, args, input=None):
@@ -103,6 +106,8 @@ class OpenSSLDriver:
             'req', '-x509',
             # Unencrypted private key.
             '-nodes',
+            # Use the given fingerprint.
+            '-' + self.new_cert_fingerprint,
             # Generate a new key.
             '-newkey', self.new_key_spec,
             # Do not prompt for a subject.
