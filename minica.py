@@ -85,15 +85,19 @@ class OpenSSLDriver:
         res = None
         try:
             res = self._run_openssl(cmdline)
+            if res['status'] != 0:
+                return {'status': 'FAIL', 'detail': res['stderr']}
+            ret = {'status': 'OK'}
+            if key_path:
+                os.chmod(key_path, 0o400)
+                ret['key_path'] = key_path
+            if cert_path:
+                os.chmod(cert_path, 0o444)
+                ret['cert_path'] = cert_path
         finally:
             if not res or res['status'] != 0:
                 if key_path: self._silent_remove(key_path)
                 if cert_path: self._silent_remove(cert_path)
-        if res['status'] != 0:
-            return {'status': 'FAIL', 'detail': res['stderr']}
-        ret = {'status': 'OK'}
-        if key_path: ret['key_path'] = key_path
-        if cert_path: ret['cert_path'] = cert_path
         return ret
 
     def create_root(self, basename):
