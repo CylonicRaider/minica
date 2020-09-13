@@ -205,6 +205,11 @@ class OpenSSLDriver:
     def create_leaf(self, new_basename, parent_basename):
         return self._create_derived(new_basename, parent_basename, False)
 
+    def remove(self, basename):
+        key_path, cert_path = self._derive_paths(basename)
+        self._silent_remove(key_path)
+        self._silent_remove(cert_path)
+
 def main():
     raise NotImplementedError
 
