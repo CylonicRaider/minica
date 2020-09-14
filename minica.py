@@ -181,13 +181,12 @@ class OpenSSLDriver:
             return self._create_cert((
                 # Sign a certificate request.
                 'x509', '-req',
-                # Use the given configuration file.
-                '-config', ext_file,
                 # Use the configured validity interval.
                 '-days', self.new_cert_validity,
                 # Who needs *serial* numbers, anyway?
                 '-set_serial', str(self.random.getrandbits(20 * 8 - 1)),
                 # Add appropriate extensions.
+                '-extfile', ext_file,
                 '-extensions', ('ext_ca' if ca else 'ext_leaf'),
                 # Use the given CA.
                 '-CA', par_cert_path, '-CAkey', par_key_path,
