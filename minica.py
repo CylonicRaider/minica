@@ -90,12 +90,12 @@ class OpenSSLDriver:
     def prepare_storage(self, replace=False):
         os.makedirs(self.storage_dir)
         os.chmod(self.storage_dir, 0o755)
-        key_dir = os.path.join(self.storage_dir, 'key')
-        os.mkdir(key_dir)
-        os.chmod(key_dir, 0o700)
         cert_dir = os.path.join(self.storage_dir, 'cert')
         os.mkdir(cert_dir)
         os.chmod(cert_dir, 0o755)
+        key_dir = os.path.join(self.storage_dir, 'key')
+        os.mkdir(key_dir)
+        os.chmod(key_dir, 0o700)
         ext_file = os.path.join(self.storage_dir, 'extensions.cnf')
         if replace or not os.path.exists(ext_file):
             with open(ext_file, 'w') as f:
@@ -105,30 +105,30 @@ class OpenSSLDriver:
         if not VALID_NAME.match(basename):
             raise ValueError('Invalid {}certificate basename'
                              .format(detail + ' ' if detail else ''))
-        return (os.path.join(self.storage_dir, 'key', basename + '.pem'),
-                os.path.join(self.storage_dir, 'cert', basename + '.pem'))
+        return (os.path.join(self.storage_dir, 'cert', basename + '.pem'),
+                os.path.join(self.storage_dir, 'key', basename + '.pem'))
 
-    def _create_cert(self, cmdline, key_path, cert_path, input=None):
+    def _create_cert(self, cmdline, cert_path, key_path, input=None):
         res = None
         try:
             res = self._run_openssl(cmdline, input)
             if res['status'] != 0:
                 return {'status': 'FAIL', 'detail': res['stderr']}
             ret = {'status': 'OK'}
-            if key_path:
-                os.chmod(key_path, 0o400)
-                ret['key_path'] = key_path
             if cert_path:
                 os.chmod(cert_path, 0o444)
                 ret['cert_path'] = cert_path
+            if key_path:
+                os.chmod(key_path, 0o400)
+                ret['key_path'] = key_path
         finally:
             if not res or res['status'] != 0:
-                if key_path: self._silent_remove(key_path)
                 if cert_path: self._silent_remove(cert_path)
+                if key_path: self._silent_remove(key_path)
         return ret
 
     def create_root(self, basename):
-        key_path, cert_path = self._derive_paths(basename)
+        cert_path, key_path = self._derive_paths(basename)
         if os.path.exists(cert_path):
             raise ValueError('New certificate basename already in use')
         return self._create_cert((
@@ -147,13 +147,13 @@ class OpenSSLDriver:
             # Use the configured validity interval.
             '-days', self.new_cert_validity,
             # Write certificate and key to files.
-            '-keyout', key_path, '-out', cert_path
-        ), key_path, cert_path)
+            '-out', cert_path, '-keyout', key_path
+        ), cert_path, key_path)
 
     def _create_derived(self, new_basename, parent_basename, ca):
-        new_key_path, new_cert_path = self._derive_paths(new_basename,
+        new_cert_path, new_key_path = self._derive_paths(new_basename,
                                                          'new')
-        par_key_path, par_cert_path = self._derive_paths(parent_basename,
+        par_cert_path, par_key_path = self._derive_paths(parent_basename,
                                                          'parent')
         if os.path.exists(new_cert_path):
             raise ValueError('New certificate basename already in use')
@@ -192,11 +192,11 @@ class OpenSSLDriver:
                 '-CA', par_cert_path, '-CAkey', par_key_path,
                 # Output the finished certificate to the correct location.
                 '-out', new_cert_path
-            ), new_key_path, new_cert_path, res_request['stdout'])
+            ), new_cert_path, new_key_path, res_request['stdout'])
         finally:
             if not success:
-                self._silent_remove(new_key_path)
                 self._silent_remove(new_cert_path)
+                self._silent_remove(new_key_path)
 
     def create_intermediate(self, new_basename, parent_basename):
         return self._create_derived(new_basename, parent_basename, True)
@@ -205,9 +205,9 @@ class OpenSSLDriver:
         return self._create_derived(new_basename, parent_basename, False)
 
     def remove(self, basename):
-        key_path, cert_path = self._derive_paths(basename)
-        self._silent_remove(key_path)
+        cert_path, key_path = self._derive_paths(basename)
         self._silent_remove(cert_path)
+        self._silent_remove(key_path)
 
 def main():
     raise NotImplementedError
