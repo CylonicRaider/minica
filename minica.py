@@ -89,8 +89,9 @@ class OpenSSLDriver:
         except OSError:
             pass
 
-    def _copy_and_chown(self, source, destination, owner, group):
+    def _copy_and_adjust(self, source, destination, mode, owner, group):
         shutil.copyfile(source, destination)
+        os.chmod(destination, mode)
         if owner is not None or group is not None:
             shutil.chown(destination, owner, group)
 
@@ -217,9 +218,11 @@ class OpenSSLDriver:
 
     def export(self, basename, cert_dest, key_dest, new_owner, new_group):
         cert_path, key_path = self._derive_paths(basename)
-        self._copy_and_chown(cert_path, cert_dest, new_owner, new_group)
+        self._copy_and_adjust(cert_path, cert_dest, 0o444,
+                              new_owner, new_group)
         if key_dest is not None:
-            self._copy_and_chown(key_path, key_dest, new_owner, new_group)
+            self._copy_and_adjust(key_path, key_dest, 0o400,
+                                  new_owner, new_group)
 
 def main():
     raise NotImplementedError
