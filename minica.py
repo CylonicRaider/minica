@@ -17,8 +17,8 @@ OPENSSL_PATH = '/usr/bin/openssl'
 
 STORAGE_DIR = '/etc/minica'
 DEFAULT_NEW_KEY_SPEC = 'rsa:4096'
-DEFAULT_NEW_CERT_FINGERPRINT = 'sha256'
-DEFAULT_NEW_CERT_VALIDITY = 30 # days
+DEFAULT_NEW_CERT_HASH = 'sha256'
+DEFAULT_NEW_CERT_DAYS = 30
 
 DEFAULT_EXTENSIONS = '''
 # X.509 extension definition file.
@@ -67,12 +67,18 @@ def split_pem_objects(lines):
     return output
 
 class OpenSSLDriver:
-    def __init__(self):
-        self.storage_dir = STORAGE_DIR
-        self.openssl_path = OPENSSL_PATH
-        self.new_key_spec = DEFAULT_NEW_KEY_SPEC
-        self.new_cert_fingerprint = DEFAULT_NEW_CERT_FINGERPRINT
-        self.new_cert_validity = DEFAULT_NEW_CERT_VALIDITY
+    def __init__(self, openssl_path=None, storage_dir=None, new_key_spec=None,
+                 new_cert_fingerprint=None, new_cert_validity=None):
+        if openssl_path is None: openssl_path = OPENSSL_PATH
+        if storage_dir is None: storage_dir = STORAGE_DIR
+        if new_key_spec is None: new_key_spec = DEFAULT_NEW_KEY_SPEC
+        if new_cert_hash is None: new_cert_hash = DEFAULT_NEW_CERT_HASH
+        if new_cert_days is None: new_cert_days = DEFAULT_NEW_CERT_DAYS
+        self.openssl_path = openssl_path
+        self.storage_dir = storage_dir
+        self.new_key_spec = new_key_spec
+        self.new_cert_hash = new_cert_hash
+        self.new_cert_days = new_cert_days
         self.random = random.SystemRandom()
 
     def _run_openssl(self, args, input=None):
@@ -144,7 +150,7 @@ class OpenSSLDriver:
             # Unencrypted private key.
             '-nodes',
             # Use the given fingerprint.
-            '-' + self.new_cert_fingerprint,
+            '-' + self.new_cert_hash,
             # Generate a new key.
             '-newkey', self.new_key_spec,
             # Do not prompt for a subject.
@@ -152,7 +158,7 @@ class OpenSSLDriver:
             # Not-that-serial number.
             '-set_serial', str(self.random.getrandbits(20 * 8 - 1)),
             # Use the configured validity interval.
-            '-days', self.new_cert_validity,
+            '-days', self.new_cert_days,
             # Write certificate and key to files.
             '-out', cert_path, '-keyout', key_path
         ), cert_path, key_path)
@@ -172,7 +178,7 @@ class OpenSSLDriver:
                 # Unencrypted private key.
                 '-nodes',
                 # Use the given fingerprint.
-                '-' + self.new_cert_fingerprint,
+                '-' + self.new_cert_hash,
                 # Generate a new key.
                 '-newkey', self.new_key_spec,
                 # Do not prompt a subject.
@@ -189,7 +195,7 @@ class OpenSSLDriver:
                 # Sign a certificate request.
                 'x509', '-req',
                 # Use the configured validity interval.
-                '-days', self.new_cert_validity,
+                '-days', self.new_cert_days,
                 # Who needs *serial* numbers, anyway?
                 '-set_serial', str(self.random.getrandbits(20 * 8 - 1)),
                 # Add appropriate extensions.
