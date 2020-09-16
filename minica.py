@@ -15,6 +15,7 @@ VALID_NAME = re.compile('^[a-zA-Z0-9._-]+$')
 
 OPENSSL_PATH = '/usr/bin/openssl'
 
+STORAGE_DIR = '/etc/minica'
 DEFAULT_NEW_KEY_SPEC = 'rsa:4096'
 DEFAULT_NEW_CERT_FINGERPRINT = 'sha256'
 DEFAULT_NEW_CERT_VALIDITY = 30 # days
@@ -66,8 +67,8 @@ def split_pem_objects(lines):
     return output
 
 class OpenSSLDriver:
-    def __init__(self, storage_dir):
-        self.storage_dir = storage_dir
+    def __init__(self):
+        self.storage_dir = STORAGE_DIR
         self.openssl_path = OPENSSL_PATH
         self.new_key_spec = DEFAULT_NEW_KEY_SPEC
         self.new_cert_fingerprint = DEFAULT_NEW_CERT_FINGERPRINT
@@ -95,7 +96,6 @@ class OpenSSLDriver:
 
     def prepare_storage(self, replace=False):
         os.makedirs(self.storage_dir)
-        os.chmod(self.storage_dir, 0o755)
         cert_dir = os.path.join(self.storage_dir, 'cert')
         os.mkdir(cert_dir)
         os.chmod(cert_dir, 0o755)
