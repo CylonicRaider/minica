@@ -101,19 +101,6 @@ class OpenSSLDriver:
         if owner is not None or group is not None:
             shutil.chown(destination, owner, group)
 
-    def prepare_storage(self, replace=False):
-        os.makedirs(self.storage_dir)
-        cert_dir = os.path.join(self.storage_dir, 'cert')
-        os.mkdir(cert_dir)
-        os.chmod(cert_dir, 0o755)
-        key_dir = os.path.join(self.storage_dir, 'key')
-        os.mkdir(key_dir)
-        os.chmod(key_dir, 0o700)
-        ext_file = os.path.join(self.storage_dir, 'extensions.cnf')
-        if replace or not os.path.exists(ext_file):
-            with open(ext_file, 'w') as f:
-                f.write(DEFAULT_EXTENSIONS)
-
     def _derive_paths(self, basename, detail=None):
         if not VALID_NAME.match(basename):
             raise ValueError('Invalid {}certificate basename'
@@ -139,6 +126,19 @@ class OpenSSLDriver:
                 if cert_path: self._silent_remove(cert_path)
                 if key_path: self._silent_remove(key_path)
         return ret
+
+    def prepare_storage(self, replace=False):
+        os.makedirs(self.storage_dir)
+        cert_dir = os.path.join(self.storage_dir, 'cert')
+        os.mkdir(cert_dir)
+        os.chmod(cert_dir, 0o755)
+        key_dir = os.path.join(self.storage_dir, 'key')
+        os.mkdir(key_dir)
+        os.chmod(key_dir, 0o700)
+        ext_file = os.path.join(self.storage_dir, 'extensions.cnf')
+        if replace or not os.path.exists(ext_file):
+            with open(ext_file, 'w') as f:
+                f.write(DEFAULT_EXTENSIONS)
 
     def create_root(self, basename):
         cert_path, key_path = self._derive_paths(basename)
