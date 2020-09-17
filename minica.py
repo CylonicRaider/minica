@@ -34,36 +34,59 @@ subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid:always,issuer
 '''[1:]
 
-def split_pem_objects(lines):
+class Error(Exception): pass
+
+class ParsingError(Error):
+    def __init__(self, file, line, message):
+        super().__init__('{}:{}: {}'.format(file, line, message))
+        self.file = file
+        self.line = line
+        self.messsage = message
+
+class ValidationError(Error): pass
+
+class ExecutionError(Error):
+    def __init__(self, summary, status=None, detail=None):
+        super().__init__('{}{}{}'.format(summary, ('\n' if detail else ''),
+                                         detail or '')
+        self.summary = summary
+        self.status = status
+        self.detail = detail
+
+def split_pem_objects(lines, filename='<input>'):
     output = []
     cur_accum = None
+    n = 0
     for n, line in enumerate(lines, 1):
         if line.startswith('-----BEGIN '):
             if not line.endswith('-----'):
-                raise ValueError('Invalid pre-encapsulation boundary on '
-                                 'line ' + str(n))
+                raise ParsingError(filename, n,
+                                   'Invalid pre-encapsulation boundary')
             elif cur_accum:
-                raise ValueError('Unexpected pre-encapsulation boundary on '
-                                 'line ' + str(n))
+                raise ParsingError(filename, n,
+                                   'Unexpected pre-encapsulation boundary')
             cur_accum = [line[11:-5], []]
         elif line.startswith('-----END '):
             if not line.endswith('-----'):
-                raise ValueError('Invalid post-encapsulation boundary on '
-                                 'line ' + str(n))
+                raise ParsingError(filename, n,
+                                   'Invalid post-encapsulation boundary')
             elif not cur_accum:
-                raise ValueError('Unexpected post-encapsulation boundary on '
-                                 'line ' + str(n))
+                raise ParsingError(filename, n,
+                                   'Unexpected post-encapsulation boundary')
             elif line[9:-5] != cur_accum[0]:
-                raise ValueError('Post-encapsulation boundary on line ' +
-                    str(n) + ' does not match pre-encapsulation boundary')
+                raise ParsingError(filename, n,
+                                   'Post-encapsulation boundary does not '
+                                   'match previous pre-encapsulation '
+                                   'boundary')
             output.append((cur_accum[0], '\n'.join(cur_accum[1])))
             cur_accum = None
         elif line.startswith('-----'):
-            raise ValueError('Invalid non-boundary line ' + str(n))
+            raise ParsingError(filename, n, 'Invalid boundary-like line')
         elif cur_accum:
             cur_accum[1].append(line)
     if cur_accum:
-        raise ValueError('Missing final post-encapsulation boundary')
+        raise ParsingError(filename, n + 1,
+                           'Missing final post-encapsulation boundary')
     return output
 
 class OpenSSLDriver:
@@ -81,12 +104,15 @@ class OpenSSLDriver:
         self.new_cert_days = new_cert_days
         self.random = random.SystemRandom()
 
-    def _run_openssl(self, args, input=None):
+    def _run_openssl(self, args, input=None, require_status=0):
         proc = subprocess.Popen((self.openssl_path,) + tuple(args),
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
         stdout, stderr = proc.communicate(input)
         status = proc.wait()
+        if require_status is not None and status != require_status:
+            raise ExecutionError('openssl exited with unexpected status {}'
+                                 .format(status), status, stderr)
         return {'status': status, 'stdout': stdout, 'stderr': stderr}
 
     def _silent_remove(self, path):
@@ -112,8 +138,6 @@ class OpenSSLDriver:
         res = None
         try:
             res = self._run_openssl(cmdline, input)
-            if res['status'] != 0:
-                return {'status': 'FAIL', 'detail': res['stderr']}
             ret = {'status': 'OK'}
             if cert_path:
                 os.chmod(cert_path, 0o444)
@@ -122,7 +146,7 @@ class OpenSSLDriver:
                 os.chmod(key_path, 0o400)
                 ret['key_path'] = key_path
         finally:
-            if not res or res['status'] != 0:
+            if not res:
                 if cert_path: self._silent_remove(cert_path)
                 if key_path: self._silent_remove(key_path)
         return ret
@@ -143,7 +167,7 @@ class OpenSSLDriver:
     def create_root(self, basename):
         cert_path, key_path = self._derive_paths(basename)
         if os.path.exists(cert_path):
-            raise ValueError('New certificate basename already in use')
+            raise ValidationError('New certificate basename already in use')
         return self._create_cert((
             # Generate self-signed certificate.
             'req', '-x509',
@@ -169,7 +193,7 @@ class OpenSSLDriver:
         par_cert_path, par_key_path = self._derive_paths(parent_basename,
                                                          'parent')
         if os.path.exists(new_cert_path):
-            raise ValueError('New certificate basename already in use')
+            raise ValidationError('New certificate basename already in use')
         success = False
         try:
             res_request = self._run_openssl((
@@ -188,8 +212,6 @@ class OpenSSLDriver:
                 # standard output.
                 '-keyout', new_key_path
             ))
-            if res_request['status'] != 0:
-                return {'status': 'FAIL', 'detail': res_request['stderr']}
             ext_file = os.path.join(self.storage_dir, 'extensions.cnf')
             return self._create_cert((
                 # Sign a certificate request.
