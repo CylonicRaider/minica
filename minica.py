@@ -55,6 +55,19 @@ class ExecutionError(Error):
         self.status = status
         self.detail = detail
 
+def parse_rdn(data):
+    items = data.split('/')
+    if not items or items[0]:
+        raise ParsingError('RDN does not start with a slash')
+    output = []
+    for item in items:
+        name, sep, value = item.partition('=')
+        if not sep:
+            raise ParsingError(
+                'RDN component does not contain an equals sign')
+        output.append((name, value))
+    return tuple(output)
+
 def split_pem_objects(lines, filename='<input>'):
     output = []
     cur_accum = None
