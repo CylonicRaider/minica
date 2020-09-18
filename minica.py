@@ -36,7 +36,9 @@ authorityKeyIdentifier = keyid:always,issuer
 
 class Error(Exception): pass
 
-class ParsingError(Error):
+class ParsingError(Error): pass
+
+class FileParsingError(ParsingError):
     def __init__(self, file, line, message):
         super().__init__('{}:{}: {}'.format(file, line, message))
         self.file = file
@@ -60,33 +62,32 @@ def split_pem_objects(lines, filename='<input>'):
     for n, line in enumerate(lines, 1):
         if line.startswith('-----BEGIN '):
             if not line.endswith('-----'):
-                raise ParsingError(filename, n,
-                                   'Invalid pre-encapsulation boundary')
+                raise FileParsingError(filename, n,
+                    'Invalid pre-encapsulation boundary')
             elif cur_accum:
-                raise ParsingError(filename, n,
-                                   'Unexpected pre-encapsulation boundary')
+                raise FileParsingError(filename, n,
+                    'Unexpected pre-encapsulation boundary')
             cur_accum = [line[11:-5], []]
         elif line.startswith('-----END '):
             if not line.endswith('-----'):
-                raise ParsingError(filename, n,
-                                   'Invalid post-encapsulation boundary')
+                raise FileParsingError(filename, n,
+                    'Invalid post-encapsulation boundary')
             elif not cur_accum:
-                raise ParsingError(filename, n,
-                                   'Unexpected post-encapsulation boundary')
+                raise FileParsingError(filename, n,
+                    'Unexpected post-encapsulation boundary')
             elif line[9:-5] != cur_accum[0]:
-                raise ParsingError(filename, n,
-                                   'Post-encapsulation boundary does not '
-                                   'match previous pre-encapsulation '
-                                   'boundary')
+                raise FileParsingError(filename, n,
+                    'Post-encapsulation boundary does not match previous '
+                    'pre-encapsulation boundary')
             output.append((cur_accum[0], '\n'.join(cur_accum[1])))
             cur_accum = None
         elif line.startswith('-----'):
-            raise ParsingError(filename, n, 'Invalid boundary-like line')
+            raise FileParsingError(filename, n, 'Invalid boundary-like line')
         elif cur_accum:
             cur_accum[1].append(line)
     if cur_accum:
-        raise ParsingError(filename, n + 1,
-                           'Missing final post-encapsulation boundary')
+        raise FileParsingError(filename, n + 1,
+            'Missing final post-encapsulation boundary')
     return output
 
 class OpenSSLDriver:
