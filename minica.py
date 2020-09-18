@@ -12,6 +12,12 @@ import subprocess
 import shutil
 
 VALID_NAME = re.compile('^[a-zA-Z0-9._-]+$')
+ISSUER_LINE = re.compile('^issuer\s*=\s*(/[^\n]*)$')
+
+ORGANIZATION = 'Local'
+UNIT_ROOT = 'Root'
+UNIT_INTERMEDIATE = 'Intermediate'
+UNIT_LEAF = 'Leaf'
 
 OPENSSL_PATH = '/usr/bin/openssl'
 
@@ -148,6 +154,34 @@ class OpenSSLDriver:
         return (os.path.join(self.storage_dir, 'cert', basename + '.pem'),
                 os.path.join(self.storage_dir, 'key', basename + '.pem'))
 
+    def _get_issuser_basename(self, filename):
+        res = self._run_openssl((
+            # Parse certificate.
+            'x509',
+            # Do not output it again.
+            '-noout',
+            # Print out the issuer.
+            '-issuer',
+            # Read input from the given file.
+            '-in', filename
+        ))
+        m = ISSUER_LINE.match(res['stdout'])
+        if not m:
+            raise ExecutionError(
+                'openssl returned invalid certificate issuer line',
+                res['status'], res['stderr'])
+        rdn_parts = parse_rdn(m.group(1))
+        if (len(rdn_parts) != 3 or
+                rdn_parts[0] != ('O', ORGANIZATION) or
+                rdn_parts[1] not in (('OU', UNIT_ROOT),
+                                     ('OU', UNIT_INTERMEDIATE)) or
+                rdn_parts[2][0] != 'CN'):
+            raise ValidationError('Invalid certificate issuer RDN')
+        basename = parts[2][1]
+        if not VALID_NAME.match(basename):
+            raise ValidationError('Invalid issuer certificate basename')
+        return basename
+
     def _create_cert(self, cmdline, cert_path, key_path, input=None):
         res = None
         try:
@@ -192,7 +226,8 @@ class OpenSSLDriver:
             # Generate a new key.
             '-newkey', self.new_key_spec,
             # Do not prompt for a subject.
-            '-subj', '/O=Local/OU=Root/CN=' + basename,
+            '-subj', '/O={}/OU={}/CN={}'.format(ORGANIZATION, UNIT_ROOT,
+                                                basename),
             # Not-that-serial number.
             '-set_serial', str(self.random.getrandbits(20 * 8 - 1)),
             # Use the configured validity interval.
@@ -220,8 +255,8 @@ class OpenSSLDriver:
                 # Generate a new key.
                 '-newkey', self.new_key_spec,
                 # Do not prompt a subject.
-                '-subj', '/O=Local/OU={}/CN={}'.format(
-                    ('Intermediate' if ca else 'Leaf'), basename),
+                '-subj', '/O={}/OU={}/CN={}'.format(ORGANIZATION,
+                    (UNIT_INTERMEDIATE if ca else UNIT_LEAF), basename),
                 # Write the key to its final location but the request to
                 # standard output.
                 '-keyout', new_key_path
