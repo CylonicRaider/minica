@@ -317,13 +317,36 @@ class OpenSSLDriver:
         self._silent_remove(cert_path)
         self._silent_remove(key_path)
 
-    def export(self, basename, cert_dest, key_dest, new_owner, new_group):
+    def export(self, basename, cert_dest, chain_dest, root_dest, key_dest,
+               new_owner, new_group):
         cert_path, key_path = self._derive_paths(basename)
-        self._copy_and_adjust(cert_path, cert_dest, 0o444,
-                              new_owner, new_group)
-        if key_dest is not None:
-            self._copy_and_adjust(key_path, key_dest, 0o400,
-                                  new_owner, new_group)
+        chain = self._collect_chain(basename)
+        cert_written = chain_written = root_written = key_written = False
+        ok = True
+        try:
+            self._write_and_adjust((chain[0][1],), cert_dest, 0o444,
+                                   new_owner, new_group)
+            cert_written = True
+            if chain_dest is not None:
+                self._write_and_adjust((p[1] for p in chain[1:-1]),
+                                       chain_dest, 0o444,
+                                       new_owner, new_group)
+                chain_written = True
+            if root_dest is not None:
+                self._write_and_adjust((chain[-1][1],), 0o444,
+                                       new_owner, new_group)
+                root_written = True
+            if key_dest is not None:
+                self._copy_and_adjust(key_path, key_dest, 0o400,
+                                      new_owner, new_group)
+                key_written = True
+            ok = True
+        finally:
+            if not ok:
+                if cert_written: self._silent_remove(cert_dest)
+                if chain_written: self._silent_remove(chain_dest)
+                if root_written: self._silent_remove(root_dest)
+                if key_written: self._silent_remove(key_dest)
 
 def main():
     raise NotImplementedError
