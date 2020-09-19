@@ -154,17 +154,22 @@ class OpenSSLDriver:
         return (os.path.join(self.storage_dir, 'cert', basename + '.pem'),
                 os.path.join(self.storage_dir, 'key', basename + '.pem'))
 
-    def _get_issuser_basename(self, filename):
-        res = self._run_openssl((
+    def _get_issuser_basename(self, filename=None, input=None):
+        if filename is not None and input is not None:
+            raise RuntimeError('_get_issuser_basename() got redundant file '
+                               'name and data')
+        cmdline = (
             # Parse certificate.
             'x509',
             # Do not output it again.
             '-noout',
             # Print out the issuer.
-            '-issuer',
+            '-issuer'
+        )
+        if filename is not None:
             # Read input from the given file.
-            '-in', filename
-        ))
+            cmdline += ('-in', filename)
+        res = self._run_openssl(cmdline, input)
         m = ISSUER_LINE.match(res['stdout'])
         if not m:
             raise ExecutionError(
