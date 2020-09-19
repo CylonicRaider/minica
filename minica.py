@@ -135,17 +135,23 @@ class OpenSSLDriver:
                                  .format(status), status, stderr)
         return {'status': status, 'stdout': stdout, 'stderr': stderr}
 
+    def _write_and_adjust(self, source, destination, mode, owner, group):
+        with open(destination, 'w') as df:
+            os.chmod(df.fileno(), mode)
+            shutil.chown(df.fileno(), owner, group)
+            for block in source:
+                df.write(block)
+
+    def _copy_and_adjust(self, source, destination, mode, owner, group):
+        with open(source) as sf:
+            self._write_and_adjust(iter(lambda: sf.read(4096), ''),
+                                   destination, mode, owner, group)
+
     def _silent_remove(self, path):
         try:
             os.remove(path)
         except OSError:
             pass
-
-    def _copy_and_adjust(self, source, destination, mode, owner, group):
-        shutil.copyfile(source, destination)
-        os.chmod(destination, mode)
-        if owner is not None or group is not None:
-            shutil.chown(destination, owner, group)
 
     def _derive_paths(self, basename, detail=None):
         if not VALID_NAME.match(basename):
