@@ -187,6 +187,19 @@ class OpenSSLDriver:
             raise ValidationError('Invalid issuer certificate basename')
         return basename
 
+    def _collect_chain(self, leaf_basename):
+        output = []
+        cur_basename = leaf_basename
+        while 1:
+            cur_path = self._derive_paths(cur_basename)[0]
+            with open(cur_path) as f:
+                cur_data = f.read()
+            output.append((cur_basename, cur_data))
+            cur_parent = self._get_issuer_basename(input=cur_data)
+            if cur_parent == cur_basename: break
+            cur_basename = cur_parent
+        return output
+
     def _create_cert(self, cmdline, cert_path, key_path, input=None):
         res = None
         try:
