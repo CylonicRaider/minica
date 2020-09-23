@@ -206,6 +206,26 @@ class OpenSSLDriver:
             cur_basename = cur_parent
         return output
 
+    def _verify_chain(self, basenames):
+        if not basenames:
+            return {'status': 'FAIL', 'detail': 'Certificate chain empty?!'}
+        cmdline = [
+            # Verify a certificate.
+            'verify',
+            # Using the given CA.
+            '-trusted', self._derive_paths(basenames[-1], 'root')[0]
+        ]
+        for ibn in basenames[-2:0:-1]:
+            cmdline.extend((
+                # Using the given intermediate CA.
+                '-untrusted', self._derive_paths(ibn, 'intermediate')[0]
+            ))
+        # And verify this certificate.
+        cmdline.append(self._derive_paths(basenames[0], 'leaf')[0])
+        res = self._call_openssl(cmdline, require_status=None)
+        if res['status'] == 0: return {'status': 'OK'}
+        return {'status': 'FAIL', 'detail': res['stderr']}
+
     def _create_cert(self, cmdline, cert_path, key_path, input=None):
         res = None
         try:
@@ -321,8 +341,11 @@ class OpenSSLDriver:
                new_owner, new_group):
         cert_path, key_path = self._derive_paths(basename)
         chain = self._collect_chain(basename)
+        ret = {'status': 'FAIL', 'warnings': ''}
+        verification_res = self._verify_chain([p[1] for p in chain])
+        if verification_res['status'] != 'OK':
+            ret['warnings'] = verification_res['detail']
         cert_written = chain_written = root_written = key_written = False
-        ok = True
         try:
             self._write_and_adjust((chain[0][1],), cert_dest, 0o444,
                                    new_owner, new_group)
@@ -340,13 +363,14 @@ class OpenSSLDriver:
                 self._copy_and_adjust(key_path, key_dest, 0o400,
                                       new_owner, new_group)
                 key_written = True
-            ok = True
+            ret['status'] = 'OK'
         finally:
-            if not ok:
+            if ret['status'] != 'OK':
                 if cert_written: self._silent_remove(cert_dest)
                 if chain_written: self._silent_remove(chain_dest)
                 if root_written: self._silent_remove(root_dest)
                 if key_written: self._silent_remove(key_dest)
+        return ret
 
 def main():
     raise NotImplementedError
