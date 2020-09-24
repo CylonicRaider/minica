@@ -10,6 +10,7 @@ import random
 import stat
 import subprocess
 import shutil
+import argparse
 
 VALID_NAME = re.compile('^[a-zA-Z0-9._-]+$')
 ISSUER_LINE = re.compile('^issuer\s*=\s*(/[^\n]*)$')
@@ -372,7 +373,89 @@ class OpenSSLDriver:
                 if key_written: self._silent_remove(key_dest)
         return ret
 
+def chown_spec(s):
+    parts = s.split(':')
+    if len(parts) == 1:
+        return (parts[0] or None, parts[0] or None)
+    elif len(parts) == 2:
+        return (parts[0] or None, parts[1] or None)
+    else:
+        raise ValueError('Too many colons in new owner specification')
+
+def derive_export_path(filename, subext):
+    root, ext = os.path.splitext(filename)
+    return '{}.{}{}'.format(root, subext, ext)
+
 def main():
+    def add_cert_params(p):
+        p.add_argument('--key-spec',
+            help='A string describing how to generate a private key (e.g. ' +
+                 DEFAULT_NEW_KEY_SPEC + ').')
+        p.add_argument('--digest',
+            help='The cryptographic hash function to use for signatures.')
+        p.add_argument('--days',
+            help='How many days the new certificate should be valid for.')
+    # Prepare command line parser.
+    p = argparse.ArgumentParser(
+        description='Simple local X.509 certificate management.')
+    p.add_argument('-S', '--store', metavar='<DIR>',
+        help='The location of the certificate store.')
+    p.add_argument('--openssl', metavar='<PATH>',
+        help='The location of the openssl executable.')
+    sp = p.add_subparsers(dest='action',
+        description='The action to perform.')
+    # (Subcommand init.)
+    p_init = sp.add_parser('init',
+        help='Initialize the certificate store (and do nothing else).')
+    # (Subcommand new-root.)
+    p_new_root = sp.add_parser('new-root',
+        help='Create a new root certificate.')
+    add_cert_params(p_new_root)
+    p_new_root.add_argument('name',
+        help='The name of the new certificate.')
+    # (Subcommand new.)
+    p_new = sp.add_parser('new',
+        help='Create a new intermediate or leaf certificate.')
+    add_cert_params(p_new)
+    p_new.add_argument('--ca', '-a', action='store_true',
+        help='Create an intermediate (CA) certificate instead of a leaf one.')
+    p_new.add_argument('--parent', '-p', metavar='<NAME>', required=True,
+        help='The name of the certificate to act as the issuer of the new '
+             'one.')
+    p_new.add_argument('name',
+        help='The name of the new certificate.')
+    # (Subcommand remove.)
+    p_remove = sp.add_parser('remove',
+        help='Delete a certificate.')
+    p_remove.add_argument('name',
+        help='The name of the certificate to delete.')
+    # (Subcommand export.)
+    p_export = sp.add_parser('export',
+        help='Copy a certificate (and associated files) from the certificate '
+             'store.')
+    p_export.add_argument('--root', '-r', action='store_true',
+        help='Export the root of the certificate\'s chain (sub-extension '
+             '".root").')
+    p_export.add_argument('--chain', '-c', action='store_true',
+        help='Export a chain of intermediate certificates up to (but not '
+             'including) the root (sub-extension ".chain").')
+    p_export.add_argument('--key', '-k', action='store_true',
+        help='Export the certificate\'s private key (sub-extension ".key").')
+    p_export.add_argument('--output', '-o', metavar='<FILENAME>',
+        help='Where to write the certificate. The names of associated files '
+             'are derived by inserting certain "sub-extensions" before this '
+             'filename\'s extension (e.g., the private key of "cert.pem" is '
+             'stored in "cert.key.pem"). Defaults to the name of the '
+             'certificate followed by ".pem".')
+    p_export.add_argument('--chown', metavar='<USER>[:<GROUP>]',
+        type=chown_spec,
+        help='Change the owner and/or group of the exported files. If '
+             '<GROUP> is omitted, it is taken to be the same as <OWNER>. '
+             'Either may be the empty string to perform no change.')
+    p_export.add_argument('name',
+        help='The name of the certificate to export.')
+    # Parse command line.
+    arguments = p.parse_args()
     raise NotImplementedError
 
 if __name__ == '__main__': main()
