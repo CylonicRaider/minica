@@ -391,7 +391,7 @@ def main():
         p.add_argument('--key-spec',
             help='A string describing how to generate a private key (e.g. ' +
                  DEFAULT_NEW_KEY_SPEC + ').')
-        p.add_argument('--digest',
+        p.add_argument('--fingerprint',
             help='The cryptographic hash function to use for signatures.')
         p.add_argument('--days',
             help='How many days the new certificate should be valid for.')
@@ -448,7 +448,7 @@ def main():
              'stored in "cert.key.pem"). Defaults to the name of the '
              'certificate followed by ".pem".')
     p_export.add_argument('--chown', metavar='<USER>[:<GROUP>]',
-        type=chown_spec,
+        type=chown_spec, default=(None, None),
         help='Change the owner and/or group of the exported files. If '
              '<GROUP> is omitted, it is taken to be the same as <OWNER>. '
              'Either may be the empty string to perform no change.')
@@ -456,6 +456,40 @@ def main():
         help='The name of the certificate to export.')
     # Parse command line.
     arguments = p.parse_args()
-    raise NotImplementedError
+    # Create driver object.
+    kwargs = {
+        'openssl_path': arguments.openssl,
+        'storage_dir': arguments.storage
+    }
+    if hasattr(arguments, 'key_spec'):
+        kwargs.update(
+            new_key_spec=arguments.key_spec,
+            new_cert_fingerprint=arguments.fingerprint,
+            new_cert_days=arguments.days
+        )
+    driver = OpenSSLDriver(**kwargs)
+    # Execute action.
+    driver.prepare_storage()
+    if arguments.action == 'init':
+        pass
+    elif arguments.action == 'new-root':
+        driver.create_root(arguments.name)
+    elif arguments.action == 'new':
+        if arguments.ca:
+            driver.create_intermediate(arguments.name, arguments.parent)
+        else:
+            driver.create_leaf(arguments.name, arguments.parent)
+    elif arguments.action == 'remove':
+        driver.remove(arguments.name)
+    elif arguments.action == 'export':
+        cert_dest = arguments.output
+        if cert_dest is None: cert_dest = arguments.name + '.pem'
+        chain_dest = derive_export_path(cert_dest, 'chain', arguments.chain)
+        root_dest = derive_export_path(cert_dest, 'root', arguments.root)
+        key_dest = derive_export_path(cert_dest, 'key', arguments.key)
+        driver.export(arguments.name, cert_dest, chain_dest, root_dest,
+                      key_dest, arguments.chown[0], arguments.chown[1])
+    else:
+        raise AssertionError('This should not happen?!')
 
 if __name__ == '__main__': main()
