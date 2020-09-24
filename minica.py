@@ -56,7 +56,7 @@ class ValidationError(Error): pass
 class ExecutionError(Error):
     def __init__(self, summary, status=None, detail=None):
         super().__init__('{}{}{}'.format(summary, ('\n' if detail else ''),
-                                         detail or '')
+                                         detail or ''))
         self.summary = summary
         self.status = status
         self.detail = detail
