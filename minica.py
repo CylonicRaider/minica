@@ -469,27 +469,33 @@ def main():
         )
     driver = OpenSSLDriver(**kwargs)
     # Execute action.
-    driver.prepare_storage()
-    if arguments.action == 'init':
-        pass
-    elif arguments.action == 'new-root':
-        driver.create_root(arguments.name)
-    elif arguments.action == 'new':
-        if arguments.ca:
-            driver.create_intermediate(arguments.name, arguments.parent)
+    try:
+        driver.prepare_storage()
+        if arguments.action == 'init':
+            pass
+        elif arguments.action == 'new-root':
+            driver.create_root(arguments.name)
+        elif arguments.action == 'new':
+            if arguments.ca:
+                driver.create_intermediate(arguments.name, arguments.parent)
+            else:
+                driver.create_leaf(arguments.name, arguments.parent)
+        elif arguments.action == 'remove':
+            driver.remove(arguments.name)
+        elif arguments.action == 'export':
+            cert_dest = arguments.output
+            if cert_dest is None: cert_dest = arguments.name + '.pem'
+            chain_dest = derive_export_path(cert_dest, 'chain',
+                                            arguments.chain)
+            root_dest = derive_export_path(cert_dest, 'root', arguments.root)
+            key_dest = derive_export_path(cert_dest, 'key', arguments.key)
+            driver.export(arguments.name, cert_dest, chain_dest, root_dest,
+                          key_dest, arguments.chown[0], arguments.chown[1])
         else:
-            driver.create_leaf(arguments.name, arguments.parent)
-    elif arguments.action == 'remove':
-        driver.remove(arguments.name)
-    elif arguments.action == 'export':
-        cert_dest = arguments.output
-        if cert_dest is None: cert_dest = arguments.name + '.pem'
-        chain_dest = derive_export_path(cert_dest, 'chain', arguments.chain)
-        root_dest = derive_export_path(cert_dest, 'root', arguments.root)
-        key_dest = derive_export_path(cert_dest, 'key', arguments.key)
-        driver.export(arguments.name, cert_dest, chain_dest, root_dest,
-                      key_dest, arguments.chown[0], arguments.chown[1])
-    else:
-        raise AssertionError('This should not happen?!')
+            raise AssertionError('This should not happen?!')
+    except Error as err:
+        sys.stderr.write('ERROR: {}\n'.format(err))
+        sys.stderr.flush()
+        raise SystemExit(2)
 
 if __name__ == '__main__': main()
