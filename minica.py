@@ -489,8 +489,13 @@ def main():
                                             arguments.chain)
             root_dest = derive_export_path(cert_dest, 'root', arguments.root)
             key_dest = derive_export_path(cert_dest, 'key', arguments.key)
-            driver.export(arguments.name, cert_dest, chain_dest, root_dest,
-                          key_dest, arguments.chown[0], arguments.chown[1])
+            res = driver.export(arguments.name, cert_dest, chain_dest,
+                                root_dest, key_dest,
+                                arguments.chown[0], arguments.chown[1])
+            if res['warnings']:
+                sys.stderr.write('WARNING: Could not validate exported '
+                                 'certificate chain:\n' +
+                                 res['warnings'])
         else:
             raise AssertionError('This should not happen?!')
     except Error as err:
