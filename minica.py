@@ -408,6 +408,9 @@ def main():
     # (Subcommand init.)
     p_init = sp.add_parser('init',
         help='Initialize the certificate store (and do nothing else).')
+    p_init.add_argument('--force', '-f', action='store_true',
+        help='Replace configuration files that may have been modified by '
+             'pristine copies.')
     # (Subcommand new-root.)
     p_new_root = sp.add_parser('new-root',
         help='Create a new root certificate.')
@@ -471,7 +474,8 @@ def main():
     driver = OpenSSLDriver(**kwargs)
     # Execute action.
     try:
-        driver.prepare_storage()
+        prepare_force = getattr(arguments, 'force', False)
+        driver.prepare_storage(prepare_force)
         if arguments.action == 'init':
             pass
         elif arguments.action == 'new-root':
