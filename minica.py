@@ -112,7 +112,7 @@ def split_pem_objects(lines, filename='<input>'):
 
 class OpenSSLDriver:
     def __init__(self, openssl_path=None, storage_dir=None, new_key_spec=None,
-                 new_cert_fingerprint=None, new_cert_validity=None):
+                 new_cert_hash=None, new_cert_days=None):
         if openssl_path is None: openssl_path = OPENSSL_PATH
         if storage_dir is None: storage_dir = STORAGE_DIR
         if new_key_spec is None: new_key_spec = DEFAULT_NEW_KEY_SPEC
@@ -245,12 +245,12 @@ class OpenSSLDriver:
         return ret
 
     def prepare_storage(self, replace=False):
-        os.makedirs(self.storage_dir)
+        os.makedirs(self.storage_dir, exist_ok=True)
         cert_dir = os.path.join(self.storage_dir, 'cert')
-        os.mkdir(cert_dir)
+        os.makedirs(cert_dir, exist_ok=True)
         os.chmod(cert_dir, 0o755)
         key_dir = os.path.join(self.storage_dir, 'key')
-        os.mkdir(key_dir)
+        os.makedirs(key_dir, exist_ok=True)
         os.chmod(key_dir, 0o700)
         ext_file = os.path.join(self.storage_dir, 'extensions.cnf')
         if replace or not os.path.exists(ext_file):
@@ -404,6 +404,7 @@ def main():
         help='The location of the openssl executable.')
     sp = p.add_subparsers(dest='action',
         description='The action to perform.')
+    sp.required = True
     # (Subcommand init.)
     p_init = sp.add_parser('init',
         help='Initialize the certificate store (and do nothing else).')
@@ -459,7 +460,7 @@ def main():
     # Create driver object.
     kwargs = {
         'openssl_path': arguments.openssl,
-        'storage_dir': arguments.storage
+        'storage_dir': arguments.store
     }
     if hasattr(arguments, 'key_spec'):
         kwargs.update(
