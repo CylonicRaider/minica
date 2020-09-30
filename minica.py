@@ -5,7 +5,7 @@
 Simple local X.509 certificate management.
 """
 
-import os, re
+import sys, os, re, time
 import random
 import stat
 import calendar
@@ -72,7 +72,7 @@ def parse_rdn(data):
     if not items or items[0]:
         raise ParsingError('RDN does not start with a slash')
     output = []
-    for item in items:
+    for item in items[1:]:
         name, sep, value = item.partition('=')
         if not sep:
             raise ParsingError(
@@ -133,7 +133,8 @@ class OpenSSLDriver:
     def _run_openssl(self, args, input=None, require_status=0):
         proc = subprocess.Popen((self.openssl_path,) + tuple(args),
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
+                                stderr=subprocess.PIPE,
+                                universal_newlines=True)
         stdout, stderr = proc.communicate(input)
         status = proc.wait()
         if require_status is not None and status != require_status:
@@ -144,7 +145,8 @@ class OpenSSLDriver:
     def _write_and_adjust(self, source, destination, mode, owner, group):
         with open(destination, 'w') as df:
             os.chmod(df.fileno(), mode)
-            shutil.chown(df.fileno(), owner, group)
+            if owner is not None or group is not None:
+                shutil.chown(df.fileno(), owner, group)
             for block in source:
                 df.write(block)
 
@@ -243,7 +245,7 @@ class OpenSSLDriver:
             ))
         # And verify this certificate.
         cmdline.append(self._derive_paths(basenames[0], 'leaf')[0])
-        res = self._call_openssl(cmdline, require_status=None)
+        res = self._run_openssl(cmdline, require_status=None)
         if res['status'] == 0: return {'status': 'OK'}
         return {'status': 'FAIL', 'detail': res['stderr']}
 
@@ -292,7 +294,7 @@ class OpenSSLDriver:
                 raise InputError('Certificate {} does not exist'
                                  .format(basename))
             entry = [basename]
-            result.append(basename)
+            result.append(entry)
             if not verbose: continue
             details = self._get_cert_meta(
                 filename=os.path.join(cert_dir, fullname))
@@ -328,7 +330,7 @@ class OpenSSLDriver:
             # Not-that-serial number.
             '-set_serial', str(self.random.getrandbits(20 * 8 - 1)),
             # Use the configured validity interval.
-            '-days', self.new_cert_days,
+            '-days', str(self.new_cert_days),
             # Write certificate and key to files.
             '-out', cert_path, '-keyout', key_path
         ), cert_path, key_path)
@@ -353,17 +355,17 @@ class OpenSSLDriver:
                 '-newkey', self.new_key_spec,
                 # Do not prompt a subject.
                 '-subj', '/O={}/OU={}/CN={}'.format(ORGANIZATION,
-                    (UNIT_INTERMEDIATE if ca else UNIT_LEAF), basename),
+                    (UNIT_INTERMEDIATE if ca else UNIT_LEAF), new_basename),
                 # Write the key to its final location but the request to
                 # standard output.
                 '-keyout', new_key_path
             ))
             ext_file = os.path.join(self.storage_dir, 'extensions.cnf')
-            return self._create_cert((
+            ret = self._create_cert((
                 # Sign a certificate request.
                 'x509', '-req',
                 # Use the configured validity interval.
-                '-days', self.new_cert_days,
+                '-days', str(self.new_cert_days),
                 # Who needs *serial* numbers, anyway?
                 '-set_serial', str(self.random.getrandbits(20 * 8 - 1)),
                 # Add appropriate extensions.
@@ -374,6 +376,8 @@ class OpenSSLDriver:
                 # Output the finished certificate to the correct location.
                 '-out', new_cert_path
             ), new_cert_path, new_key_path, res_request['stdout'])
+            success = True
+            return ret
         finally:
             if not success:
                 self._silent_remove(new_cert_path)
@@ -395,7 +399,7 @@ class OpenSSLDriver:
         cert_path, key_path = self._derive_paths(basename)
         chain = self._collect_chain(basename)
         ret = {'status': 'FAIL', 'warnings': ''}
-        verification_res = self._verify_chain([p[1] for p in chain])
+        verification_res = self._verify_chain([p[0] for p in chain])
         if verification_res['status'] != 'OK':
             ret['warnings'] = verification_res['detail']
         cert_written = chain_written = root_written = key_written = False
@@ -434,7 +438,8 @@ def chown_spec(s):
     else:
         raise ValueError('Too many colons in new owner specification')
 
-def derive_export_path(filename, subext):
+def derive_export_path(filename, subext, condition=True):
+    if not condition: return None
     root, ext = os.path.splitext(filename)
     return '{}.{}{}'.format(root, subext, ext)
 
@@ -443,7 +448,7 @@ def main():
         p.add_argument('--key-spec',
             help='A string describing how to generate a private key (e.g. ' +
                  DEFAULT_NEW_KEY_SPEC + ').')
-        p.add_argument('--fingerprint',
+        p.add_argument('--hash',
             help='The cryptographic hash function to use for signatures.')
         p.add_argument('--days',
             help='How many days the new certificate should be valid for.')
@@ -479,7 +484,7 @@ def main():
                     result[-1].extend((item, widths[i]))
             while len(result[-1]) < rank * 2:
                 result[-1].extend(('', 0))
-        fmt = '{:{}}' * len(widths)
+        fmt = ' '.join(['{:<{}}'] * len(widths))
         return fmt, result
 
     # Prepare command line parser.
@@ -563,7 +568,7 @@ def main():
     if hasattr(arguments, 'key_spec'):
         kwargs.update(
             new_key_spec=arguments.key_spec,
-            new_cert_fingerprint=arguments.fingerprint,
+            new_cert_hash=arguments.hash,
             new_cert_days=arguments.days
         )
     driver = OpenSSLDriver(**kwargs)
@@ -574,7 +579,7 @@ def main():
         if arguments.action == 'init':
             pass
         elif arguments.action == 'list':
-            res = driver.list(arguments.name, verbose=arguments.long)
+            res = driver.list(arguments.name or None, verbose=arguments.long)
             fmt, rows = layout_listing(res['result'])
             for row in rows:
                 print(fmt.format(*row))
