@@ -8,12 +8,13 @@ Simple local X.509 certificate management.
 import os, re
 import random
 import stat
+import calendar
 import subprocess
 import shutil
 import argparse
+import email.utils
 
 VALID_NAME = re.compile('^[a-zA-Z0-9._-]+$')
-ISSUER_LINE = re.compile('^issuer\s*=\s*(/[^\n]*)$')
 
 ORGANIZATION = 'Local'
 UNIT_ROOT = 'Root'
@@ -40,6 +41,8 @@ basicConstraints = critical,CA:FALSE
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid:always,issuer
 '''[1:]
+
+PARSE_LINE = re.compile('^([a-zA-Z0-9]+)\s*=\s*(.*)$')
 
 class Error(Exception): pass
 
@@ -161,38 +164,53 @@ class OpenSSLDriver:
         return (os.path.join(self.storage_dir, 'cert', basename + '.pem'),
                 os.path.join(self.storage_dir, 'key', basename + '.pem'))
 
-    def _get_issuser_basename(self, filename=None, input=None):
+    def _get_cert_meta(self, filename=None, input=None):
+        def decode_rdn(name):
+            parts = parse_rdn(name)
+            if (len(parts) != 3 or
+                    parts[0] != ('O', ORGANIZATION) or
+                    parts[1] not in (('OU', UNIT_ROOT),
+                                     ('OU', UNIT_INTERMEDIATE),
+                                     ('OU', UNIT_LEAF)) or
+                    parts[2][0] != 'CN'):
+                raise ValidationError('Invalid certificate RDN structure')
+            basename = parts[2][1]
+            if not VALID_NAME.match(basename):
+                raise ValidationError('Invalid certificate RDN basename')
+            return (parts[1][1], basename)
+
+        def decode_timestamp(text):
+            return calendar.timegm(email.utils.parsedate(text))
+
         if filename is not None and input is not None:
-            raise RuntimeError('_get_issuser_basename() got redundant file '
+            raise RuntimeError('_get_cert_name() got redundant file '
                                'name and data')
         cmdline = (
             # Parse certificate.
             'x509',
             # Do not output it again.
             '-noout',
-            # Print out the issuer.
-            '-issuer'
+            # Print out the subject and issuer.
+            '-subject', '-issuer',
+            # ...As well as the notBefore and notAfter dates.
+            '-dates'
         )
         if filename is not None:
             # Read input from the given file.
             cmdline += ('-in', filename)
         res = self._run_openssl(cmdline, input)
-        m = ISSUER_LINE.match(res['stdout'])
-        if not m:
-            raise ExecutionError(
-                'openssl returned invalid certificate issuer line',
-                res['status'], res['stderr'])
-        rdn_parts = parse_rdn(m.group(1))
-        if (len(rdn_parts) != 3 or
-                rdn_parts[0] != ('O', ORGANIZATION) or
-                rdn_parts[1] not in (('OU', UNIT_ROOT),
-                                     ('OU', UNIT_INTERMEDIATE)) or
-                rdn_parts[2][0] != 'CN'):
-            raise ValidationError('Invalid certificate issuer RDN')
-        basename = parts[2][1]
-        if not VALID_NAME.match(basename):
-            raise ValidationError('Invalid issuer certificate basename')
-        return basename
+        raw_data = {}
+        for line in res['stdout'].split('\n'):
+            if not line: continue
+            m = PARSE_LINE.match(line)
+            if not m:
+                raise ExecutionError('openssl returned invalid certificate '
+                    'metadata line', res['status'], res['stderr'])
+            raw_data[m.group(1)] = m.group(2)
+        return {'subject': decode_rdn(raw_data['subject']),
+                'issuer': decode_rdn(raw_data['issuer']),
+                'notBefore': decode_timestamp(raw_data['notBefore']),
+                'notAfter': decode_timestamp(raw_data['notAfter'])}
 
     def _collect_chain(self, leaf_basename):
         output = []
@@ -202,7 +220,7 @@ class OpenSSLDriver:
             with open(cur_path) as f:
                 cur_data = f.read()
             output.append((cur_basename, cur_data))
-            cur_parent = self._get_issuer_basename(input=cur_data)
+            cur_parent = self._get_cert_meta(input=cur_data)['issuer'][1]
             if cur_parent == cur_basename: break
             cur_basename = cur_parent
         return output
@@ -256,6 +274,33 @@ class OpenSSLDriver:
         if replace or not os.path.exists(ext_file):
             with open(ext_file, 'w') as f:
                 f.write(DEFAULT_EXTENSIONS)
+
+    def list(self, verbose=False):
+        def format_timestamp(ts):
+            return time.strftime('%Y-%m-%d %H:%M:%S Z', time.gmtime(ts))
+
+        result, warnings = [], []
+        cert_dir = os.path.join(self.storage_dir, 'cert')
+        for name in os.listdir(cert_dir):
+            if not name.endswith('.pem'): continue
+            basename = name[:-4]
+            entry = [basename]
+            result.append(basename)
+            if not verbose: continue
+            details = self._get_cert_meta(
+                filename=os.path.join(cert_dir, name))
+            if details['subject'][1] != basename:
+                warnings.append('{}: Basename in certificate ({}) does not '
+                                'match file name'
+                                .format(basename, details['subject'][1]))
+            entry.extend((
+                ('type', '{}'.format(details['subject'][0])),
+                ('issuer', '{} {}'.format(details['issuer'][0],
+                                          details['issuer'][1])),
+                ('notBefore', format_timestamp(details['notBefore'])),
+                ('notAfter', format_timestamp(details['notAfter']))
+            ))
+        return {'result': result, 'warnings': warnings}
 
     def create_root(self, basename):
         cert_path, key_path = self._derive_paths(basename)
