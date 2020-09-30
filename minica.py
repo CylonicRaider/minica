@@ -46,7 +46,9 @@ PARSE_LINE = re.compile('^([a-zA-Z0-9]+)\s*=\s*(.*)$')
 
 class Error(Exception): pass
 
-class ParsingError(Error): pass
+class InputError(Error): pass
+
+class ParsingError(InputError): pass
 
 class FileParsingError(ParsingError):
     def __init__(self, file, line, message):
@@ -159,7 +161,7 @@ class OpenSSLDriver:
 
     def _derive_paths(self, basename, detail=None):
         if not VALID_NAME.match(basename):
-            raise ValueError('Invalid {}certificate basename'
+            raise InputError('Invalid {}certificate basename'
                              .format(detail + ' ' if detail else ''))
         return (os.path.join(self.storage_dir, 'cert', basename + '.pem'),
                 os.path.join(self.storage_dir, 'key', basename + '.pem'))
