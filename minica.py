@@ -304,8 +304,8 @@ class OpenSSLDriver:
                                 .format(basename, details['subject'][1]))
             entry.extend((
                 ('type', '{}'.format(details['subject'][0])),
-                ('issuer', '{} {}'.format(details['issuer'][0],
-                                          details['issuer'][1])),
+                ('issuer', '{} ({})'.format(details['issuer'][1],
+                                            details['issuer'][0])),
                 ('notBefore', format_timestamp(details['notBefore'])),
                 ('notAfter', format_timestamp(details['notAfter']))
             ))
