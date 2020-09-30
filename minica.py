@@ -447,6 +447,41 @@ def main():
             help='The cryptographic hash function to use for signatures.')
         p.add_argument('--days',
             help='How many days the new certificate should be valid for.')
+
+    def layout_listing(data):
+        rows, rank = [], 0
+        for data_row in data:
+            last = len(data_row) - 1
+            if last >= rank: rank = last + 1
+            rows.append([])
+            for i, item in enumerate(data_row):
+                if i == 0 and i == last:
+                    rows[-1].append(item)
+                elif i == 0:
+                    rows[-1].append(item + ':')
+                elif i == last:
+                    rows[-1].append('{}: {}'.format(*item))
+                else:
+                    rows[-1].append('{}: {};'.format(*item))
+        widths = [0] * rank
+        for row in rows:
+            for i, item in enumerate(row):
+                if len(item) > widths[i]:
+                    widths[i] = len(item)
+        result = []
+        for row in rows:
+            last = len(row) - 1
+            result.append([])
+            for i, item in enumerate(row):
+                if i == last:
+                    result[-1].extend((item, 0))
+                else:
+                    result[-1].extend((item, widths[i]))
+            while len(result[-1]) < rank * 2:
+                result[-1].extend(('', 0))
+        fmt = '{:{}}' * len(widths)
+        return fmt, result
+
     # Prepare command line parser.
     p = argparse.ArgumentParser(
         description='Simple local X.509 certificate management.')
@@ -463,6 +498,14 @@ def main():
     p_init.add_argument('--force', '-f', action='store_true',
         help='Replace configuration files that may have been modified by '
              'pristine copies.')
+    # (Subcommand list.)
+    p_list = sp.add_parser('list',
+        help='Display certificates.')
+    p_list.add_argument('-l', '--long', action='store_true',
+        help='Display additional information about each certificate (beyond '
+             'its name).')
+    p_list.add_argument('name', nargs='*',
+        help='The name of a certificate to display (defaults to all).')
     # (Subcommand new-root.)
     p_new_root = sp.add_parser('new-root',
         help='Create a new root certificate.')
@@ -530,6 +573,13 @@ def main():
         driver.prepare_storage(prepare_force)
         if arguments.action == 'init':
             pass
+        elif arguments.action == 'list':
+            res = driver.list(arguments.name, verbose=arguments.long)
+            fmt, rows = layout_listing(res['result'])
+            for row in rows:
+                print(fmt.format(*row))
+            for warning in res['warnings']:
+                sys.stderr.write('WARNING: {}\n'.format(warning))
         elif arguments.action == 'new-root':
             driver.create_root(arguments.name)
         elif arguments.action == 'new':
