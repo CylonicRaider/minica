@@ -277,20 +277,25 @@ class OpenSSLDriver:
             with open(ext_file, 'w') as f:
                 f.write(DEFAULT_EXTENSIONS)
 
-    def list(self, verbose=False):
+    def list(self, basenames=None, verbose=False):
         def format_timestamp(ts):
             return time.strftime('%Y-%m-%d %H:%M:%S Z', time.gmtime(ts))
 
-        result, warnings = [], []
         cert_dir = os.path.join(self.storage_dir, 'cert')
-        for name in os.listdir(cert_dir):
-            if not name.endswith('.pem'): continue
-            basename = name[:-4]
+        if basenames is None:
+            basenames = [n[:-4] for n in os.listdir(cert_dir)
+                         if n.endswith('.pem')]
+        result, warnings = [], []
+        for basename in basenames:
+            fullname = self._derive_paths(basename)[0]
+            if not os.path.exists(fullname):
+                raise InputError('Certificate {} does not exist'
+                                 .format(basename))
             entry = [basename]
             result.append(basename)
             if not verbose: continue
             details = self._get_cert_meta(
-                filename=os.path.join(cert_dir, name))
+                filename=os.path.join(cert_dir, fullname))
             if details['subject'][1] != basename:
                 warnings.append('{}: Basename in certificate ({}) does not '
                                 'match file name'
