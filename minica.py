@@ -413,7 +413,7 @@ class OpenSSLDriver:
                                        new_owner, new_group)
                 chain_written = True
             if root_dest is not None:
-                self._write_and_adjust((chain[-1][1],), 0o444,
+                self._write_and_adjust((chain[-1][1],), root_dest, 0o444,
                                        new_owner, new_group)
                 root_written = True
             if key_dest is not None:
