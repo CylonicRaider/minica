@@ -14,7 +14,7 @@ import shutil
 import argparse
 import email.utils
 
-VALID_NAME = re.compile('^[a-zA-Z0-9._-]+$')
+VALID_NAME = re.compile(r'^[a-zA-Z0-9._-]+$')
 
 ORGANIZATION = 'Local'
 UNIT_ROOT = 'Root'
@@ -28,7 +28,7 @@ DEFAULT_NEW_KEY_SPEC = 'rsa:4096'
 DEFAULT_NEW_CERT_HASH = 'sha256'
 DEFAULT_NEW_CERT_DAYS = 30
 
-PARSE_LINE = re.compile('^([a-zA-Z0-9]+)\s*=\s*(.*)$')
+PARSE_LINE = re.compile(r'^([a-zA-Z0-9]+)\s*=\s*(.*)$')
 
 class Error(Exception): pass
 
