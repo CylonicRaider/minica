@@ -101,7 +101,7 @@ def split_pem_objects(lines, filename='<input>'):
             'Missing final post-encapsulation boundary')
     return output
 
-class OpenSSLDriver:
+class MiniCA:
     def __init__(self, openssl_path=None, storage_dir=None, new_key_spec=None,
                  new_cert_hash=None, new_cert_days=None):
         if openssl_path is None: openssl_path = OPENSSL_PATH
@@ -555,29 +555,29 @@ def main():
             new_cert_hash=arguments.hash,
             new_cert_days=arguments.days
         )
-    driver = OpenSSLDriver(**kwargs)
+    ca = MiniCA(**kwargs)
     # Execute action.
     try:
         prepare_force = getattr(arguments, 'force', False)
-        driver.prepare_storage(prepare_force)
+        ca.prepare_storage(prepare_force)
         if arguments.action == 'init':
             pass
         elif arguments.action == 'list':
-            res = driver.list(arguments.name or None, verbose=arguments.long)
+            res = ca.list(arguments.name or None, verbose=arguments.long)
             fmt, rows = layout_listing(res['result'])
             for row in rows:
                 print(fmt.format(*row))
             for warning in res['warnings']:
                 sys.stderr.write('WARNING: {}\n'.format(warning))
         elif arguments.action == 'new-root':
-            driver.create_root(arguments.name)
+            ca.create_root(arguments.name)
         elif arguments.action == 'new':
             if arguments.ca:
-                driver.create_intermediate(arguments.name, arguments.parent)
+                ca.create_intermediate(arguments.name, arguments.parent)
             else:
-                driver.create_leaf(arguments.name, arguments.parent)
+                ca.create_leaf(arguments.name, arguments.parent)
         elif arguments.action == 'remove':
-            driver.remove(arguments.name)
+            ca.remove(arguments.name)
         elif arguments.action == 'export':
             cert_dest = arguments.output
             if cert_dest is None: cert_dest = arguments.name + '.pem'
@@ -585,9 +585,8 @@ def main():
                                             arguments.chain)
             root_dest = derive_export_path(cert_dest, 'root', arguments.root)
             key_dest = derive_export_path(cert_dest, 'key', arguments.key)
-            res = driver.export(arguments.name, cert_dest, chain_dest,
-                                root_dest, key_dest,
-                                arguments.chown[0], arguments.chown[1])
+            res = ca.export(arguments.name, cert_dest, chain_dest, root_dest,
+                            key_dest, arguments.chown[0], arguments.chown[1])
             if res['warnings']:
                 sys.stderr.write('WARNING: Could not validate exported '
                                  'certificate chain:\n' +
