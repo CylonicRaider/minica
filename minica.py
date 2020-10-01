@@ -8,7 +8,7 @@ Simple local X.509 certificate management.
 import sys, os, re, time
 import random
 import stat
-import calendar
+import calendar, datetime
 import subprocess
 import shutil
 import argparse
@@ -29,6 +29,10 @@ DEFAULT_NEW_CERT_HASH = 'sha256'
 DEFAULT_NEW_CERT_DAYS = 30
 
 PARSE_LINE = re.compile(r'^([a-zA-Z0-9]+)\s*=\s*(.*)$')
+DAYS_IN_TOKEN = re.compile(r'([+-]?[1-9][0-9]*)([dwmyDWMY])')
+DAYS_IN_PATTERN = re.compile(
+    r'^(?:[+-]?[1-9][0-9]*[dwmyDWMY]\s*)*(?:[+-]?[1-9][0-9]*[dwmyDWMY])$')
+WHITESPACE = re.compile(r'\s+')
 
 class Error(Exception): pass
 
@@ -65,6 +69,41 @@ def parse_rdn(data):
                 'RDN component does not contain an equals sign')
         output.append((name, value))
     return tuple(output)
+
+def parse_days_in(spec, base=None):
+    if not DAYS_IN_PATTERN.match(spec):
+        raise ValueError('Invalid days-in specification: {}'.format(spec))
+    cur = datetime.date.today() if base is None else base
+    index = 0
+    while 1:
+        m = WHITESPACE.match(spec, index)
+        if m: index = m.end()
+        m = DAYS_IN_TOKEN.match(spec, index)
+        if not m: break
+        index = m.end()
+        count = int(m.group(1))
+        unit = m.group(2).lower()
+        if unit == 'd':
+            cur += datetime.timedelta(days=count)
+        elif unit == 'w':
+            cur += datetime.timedelta(weeks=count)
+        elif unit == 'm':
+            # Yay for lacking functionality!
+            new_month_idx = cur.year * 12 + (cur.month - 1) + count
+            new_year, new_month = divmod(new_month_idx, 12)
+            new_month += 1
+            new_month_len = calendar.monthrange(new_year, new_month)[1]
+            new_day = min(cur.day, new_month_len)
+            cur = datetime.date(new_year, new_month, new_day)
+        elif unit == 'y':
+            cur = cur.replace(year=cur.year + count)
+        else:
+            raise AssertionError('This should not happen!')
+    if index < len(spec):
+        # This *should* not happen.
+        raise ValueError('Invalid days-in specification (has trailing '
+            'junk): {}'.format(spec))
+    return cur
 
 def split_pem_objects(lines, filename='<input>'):
     output = []
@@ -413,6 +452,14 @@ class MiniCA:
                 if key_written: self._silent_remove(key_dest)
         return ret
 
+def days_in(s):
+    try:
+        return int(s)
+    except ValueError:
+        today = datetime.date.today()
+        then = parse_days_in(s, today)
+        return (then - today).days
+
 def chown_spec(s):
     parts = s.split(':')
     if len(parts) == 1:
@@ -434,7 +481,7 @@ def main():
                  DEFAULT_NEW_KEY_SPEC + ').')
         p.add_argument('--hash',
             help='The cryptographic hash function to use for signatures.')
-        p.add_argument('--days',
+        p.add_argument('--days', type=days_in,
             help='How many days the new certificate should be valid for.')
 
     def layout_listing(data):
