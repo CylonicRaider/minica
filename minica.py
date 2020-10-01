@@ -28,20 +28,6 @@ DEFAULT_NEW_KEY_SPEC = 'rsa:4096'
 DEFAULT_NEW_CERT_HASH = 'sha256'
 DEFAULT_NEW_CERT_DAYS = 30
 
-DEFAULT_EXTENSIONS = '''
-# X.509 extension definition file.
-# Do not rename the "ext_ca" and "ext_leaf" sections!
-
-[ext_ca]
-basicConstraints = critical,CA:TRUE
-keyUsage = nonRepudiation, digitalSignature, keyEncipherment
-
-[ext_leaf]
-basicConstraints = critical,CA:FALSE
-subjectKeyIdentifier = hash
-authorityKeyIdentifier = keyid:always,issuer
-'''[1:]
-
 PARSE_LINE = re.compile('^([a-zA-Z0-9]+)\s*=\s*(.*)$')
 
 class Error(Exception): pass
@@ -274,10 +260,6 @@ class OpenSSLDriver:
         key_dir = os.path.join(self.storage_dir, 'key')
         os.makedirs(key_dir, exist_ok=True)
         os.chmod(key_dir, 0o700)
-        ext_file = os.path.join(self.storage_dir, 'extensions.cnf')
-        if replace or not os.path.exists(ext_file):
-            with open(ext_file, 'w') as f:
-                f.write(DEFAULT_EXTENSIONS)
 
     def list(self, basenames=None, verbose=False):
         def format_timestamp(ts):
@@ -360,22 +342,24 @@ class OpenSSLDriver:
                 # standard output.
                 '-keyout', new_key_path
             ))
-            ext_file = os.path.join(self.storage_dir, 'extensions.cnf')
-            ret = self._create_cert((
+            cert_options = (
                 # Sign a certificate request.
                 'x509', '-req',
                 # Use the configured validity interval.
                 '-days', str(self.new_cert_days),
                 # Who needs *serial* numbers, anyway?
                 '-set_serial', str(self.random.getrandbits(20 * 8 - 1)),
-                # Add appropriate extensions.
-                '-extfile', ext_file,
-                '-extensions', ('ext_ca' if ca else 'ext_leaf'),
                 # Use the given CA.
                 '-CA', par_cert_path, '-CAkey', par_key_path,
                 # Output the finished certificate to the correct location.
                 '-out', new_cert_path
-            ), new_cert_path, new_key_path, res_request['stdout'])
+            )
+            if ca:
+                # The secion name is mentioned in the openssl-ca
+                # documentation.
+                cert_options += ('-extensions', 'v3_ca')
+            ret = self._create_cert(cert_options, new_cert_path, new_key_path,
+                                    res_request['stdout'])
             success = True
             return ret
         finally:
