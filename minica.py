@@ -40,13 +40,6 @@ class InputError(Error): pass
 
 class ParsingError(InputError): pass
 
-class FileParsingError(ParsingError):
-    def __init__(self, file, line, message):
-        super().__init__('{}:{}: {}'.format(file, line, message))
-        self.file = file
-        self.line = line
-        self.messsage = message
-
 class ValidationError(Error): pass
 
 class ExecutionError(Error):
@@ -104,41 +97,6 @@ def parse_days_in(spec, base=None):
         raise ValueError('Invalid days-in specification (has trailing '
             'junk): {}'.format(spec))
     return cur
-
-def split_pem_objects(lines, filename='<input>'):
-    output = []
-    cur_accum = None
-    n = 0
-    for n, line in enumerate(lines, 1):
-        if line.startswith('-----BEGIN '):
-            if not line.endswith('-----'):
-                raise FileParsingError(filename, n,
-                    'Invalid pre-encapsulation boundary')
-            elif cur_accum:
-                raise FileParsingError(filename, n,
-                    'Unexpected pre-encapsulation boundary')
-            cur_accum = [line[11:-5], []]
-        elif line.startswith('-----END '):
-            if not line.endswith('-----'):
-                raise FileParsingError(filename, n,
-                    'Invalid post-encapsulation boundary')
-            elif not cur_accum:
-                raise FileParsingError(filename, n,
-                    'Unexpected post-encapsulation boundary')
-            elif line[9:-5] != cur_accum[0]:
-                raise FileParsingError(filename, n,
-                    'Post-encapsulation boundary does not match previous '
-                    'pre-encapsulation boundary')
-            output.append((cur_accum[0], '\n'.join(cur_accum[1])))
-            cur_accum = None
-        elif line.startswith('-----'):
-            raise FileParsingError(filename, n, 'Invalid boundary-like line')
-        elif cur_accum:
-            cur_accum[1].append(line)
-    if cur_accum:
-        raise FileParsingError(filename, n + 1,
-            'Missing final post-encapsulation boundary')
-    return output
 
 class MiniCA:
     def __init__(self, openssl_path=None, storage_dir=None, new_key_spec=None,
