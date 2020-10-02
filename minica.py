@@ -34,16 +34,47 @@ DAYS_IN_PATTERN = re.compile(
     r'^(?:[+-]?[1-9][0-9]*[dwmyDWMY]\s*)*(?:[+-]?[1-9][0-9]*[dwmyDWMY])$')
 WHITESPACE = re.compile(r'\s+')
 
-class Error(Exception): pass
+class Error(Exception):
+    """
+    Base class for exceptions raised by this module.
+    """
 
-class InputError(Error): pass
+class InputError(Error):
+    """
+    Exception raised to indicate generic problems with some input.
+    """
 
-class ParsingError(InputError): pass
+class ParsingError(InputError):
+    """
+    Exception raised when an input could not be parsed.
+    """
 
-class ValidationError(Error): pass
+class ValidationError(Error):
+    """
+    Exception raised when something failed validation.
+    """
 
 class ExecutionError(Error):
+    """
+    ExecutionError(summary, status=None, detail=None) -> new instance
+
+    Exception raised when an external command failed.
+
+    summary is a textual message summarizing the error.
+
+    status is an integer containing the command's exit status code (if
+    available).
+
+    detail contains additional information as a string (such as a standard
+    error dump), or None if not available.
+
+    The string representation of an instance consists of summary followed by
+    detail (with None interpreted as the empty string), separated by a newline
+    if detail is not empty.
+    """
+
     def __init__(self, summary, status=None, detail=None):
+        "Instance initializer; see the class docstring for details."
         super().__init__('{}{}{}'.format(summary, ('\n' if detail else ''),
                                          detail or ''))
         self.summary = summary
@@ -146,8 +177,8 @@ class MiniCA:
 
     def _derive_paths(self, basename, detail=None):
         if not VALID_NAME.match(basename):
-            raise InputError('Invalid {}certificate basename'
-                             .format(detail + ' ' if detail else ''))
+            raise ValidationError('Invalid {}certificate basename'
+                                  .format(detail + ' ' if detail else ''))
         return (os.path.join(self.storage_dir, 'cert', basename + '.pem'),
                 os.path.join(self.storage_dir, 'key', basename + '.pem'))
 
