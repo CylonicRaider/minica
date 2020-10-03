@@ -504,6 +504,7 @@ def derive_export_path(filename, subext, condition=True):
 def main():
     "Main function."
     def add_cert_params(p):
+        "Helper: Configure the parameters common to new-root and new."
         p.add_argument('--key-spec',
             help='A string describing how to generate a private key (e.g. ' +
                  DEFAULT_NEW_KEY_SPEC + ').')
@@ -513,6 +514,7 @@ def main():
             help='How many days the new certificate should be valid for.')
 
     def layout_listing(data):
+        "Helper: Prepare a certificate listing for columnar output."
         rows, rank = [], 0
         for data_row in data:
             last = len(data_row) - 1
@@ -641,7 +643,7 @@ def main():
             res = ca.list(arguments.name or None, verbose=arguments.long)
             fmt, rows = layout_listing(res['result'])
             for row in rows:
-                print(fmt.format(*row))
+                print(fmt.format(*row).rstrip())
             for warning in res['warnings']:
                 sys.stderr.write('WARNING: {}\n'.format(warning))
         elif arguments.action == 'new-root':
