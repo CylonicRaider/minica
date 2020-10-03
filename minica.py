@@ -81,8 +81,16 @@ class ExecutionError(Error):
         self.status = status
         self.detail = detail
 
-def parse_rdn(data):
-    items = data.split('/')
+def parse_rdn(text):
+    """
+    Parse an RDN (Relative Distinguished Name) into a list of type-name pairs.
+
+    This expects text to be formatted as done by default by openssl-x509, i.e.
+        /TYPE1=name1/TYPE2=name2/TYPE3=name3/...
+    Whitespace is significant. Multi-valued RDNs are not supported. The parse
+    result is returned.
+    """
+    items = text.split('/')
     if not items or items[0]:
         raise ParsingError('RDN does not start with a slash')
     output = []
@@ -95,6 +103,30 @@ def parse_rdn(data):
     return tuple(output)
 
 def parse_days_in(spec, base=None):
+    """
+    Parse an extended days-in specification.
+
+    The specification (spec) consists of "duration tokens" with optional
+    intervening whitespace. A duration token consists of a (positive or
+    negative) integer followed immediately by a time unit letter, one of
+    "d"/"w"/"m"/"y", meaning "days"/"weeks"/"months"/"years", respectively.
+
+    base is the base date to apply the algorithm to, as a datetime.date
+    instance, defaulting to today.
+
+    The parsing algorithm takes each duration token individually in the order
+    given and shifts the current date (initialized from the base date) by the
+    amount denoted by the token (with positive amounts shifting into the
+    future). If the day-of-month is out of range after applying a "months" or
+    "years" token, it is clamped into range, keeping the year and month the
+    unchanged.
+
+    For example, applying the days-in string "1y 2m" to the date 2000-02-29
+    results in the date 2001-04-28; in contrast, applying the string "2m 1y"
+    to 2000-02-29 results in 2001-04-29.
+
+    Returns the appropriately shifted base date as a datetime.date instance.
+    """
     if not DAYS_IN_PATTERN.match(spec):
         raise ValueError('Invalid days-in specification: {}'.format(spec))
     cur = datetime.date.today() if base is None else base
@@ -120,7 +152,10 @@ def parse_days_in(spec, base=None):
             new_day = min(cur.day, new_month_len)
             cur = datetime.date(new_year, new_month, new_day)
         elif unit == 'y':
-            cur = cur.replace(year=cur.year + count)
+            new_year, new_month = cur.year + count, cur.month
+            new_month_len = calendar.monthrange(new_year, new_month)[1]
+            new_day = min(cur.day, new_month_len)
+            cur = datetime.date(new_year, new_month, new_day)
         else:
             raise AssertionError('This should not happen!')
     if index < len(spec):
@@ -442,6 +477,7 @@ class MiniCA:
         return ret
 
 def days_in(s):
+    "Helper: Parse a --days command-line argument value."
     try:
         return int(s)
     except ValueError:
@@ -450,6 +486,7 @@ def days_in(s):
         return (then - today).days
 
 def chown_spec(s):
+    "Helper: Parse a --chown command-line argument value."
     parts = s.split(':')
     if len(parts) == 1:
         return (parts[0] or None, parts[0] or None)
@@ -459,11 +496,13 @@ def chown_spec(s):
         raise ValueError('Too many colons in new owner specification')
 
 def derive_export_path(filename, subext, condition=True):
+    "Helper: Compute a certificate export result path, or return None."
     if not condition: return None
     root, ext = os.path.splitext(filename)
     return '{}.{}{}'.format(root, subext, ext)
 
 def main():
+    "Main function."
     def add_cert_params(p):
         p.add_argument('--key-spec',
             help='A string describing how to generate a private key (e.g. ' +
