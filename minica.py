@@ -165,8 +165,33 @@ def parse_days_in(spec, base=None):
     return cur
 
 class MiniCA:
+    """
+    MiniCA(openssl_path=None, storage_dir=None, new_key_spec=None,
+        new_cert_hash=None, new_cert_days=None) -> new instance
+
+    Certificate manager backed by the OpenSSL command-line interface.
+
+    The constructor arguments specify various configuration values; they
+    default to similarly-named module-level constants:
+    openssl_path : Where the OpenSSL CLI binary is located. (OPEENSSL_PATH)
+    storage_dir  : Where the certificate and key store should be located,
+                   as a filesystem path. (STORAGE_DIR)
+    new_key_spec : How new private keys should be constructed.
+                   (DEFAULT_NEW_KEY_SPEC)
+    new_cert_hash: The cryptographic hash function to be used for new
+                   certificate signatures. (DEFAULT_NEW_CERT_HASH)
+    new_cert_days: How long a new certificate should be valid, in days, as an
+                   integer. (DEFAULT_NEW_CERT_DAYS)
+    The arguments (after default value substitution) are stored as same-named
+    instance attributes.
+
+    Most of the instance methods assume that the certificate store has been
+    initialized using the prepare_storage() method beforehand.
+    """
+
     def __init__(self, openssl_path=None, storage_dir=None, new_key_spec=None,
                  new_cert_hash=None, new_cert_days=None):
+        "Instance initializer; see the class docstring for details."
         if openssl_path is None: openssl_path = OPENSSL_PATH
         if storage_dir is None: storage_dir = STORAGE_DIR
         if new_key_spec is None: new_key_spec = DEFAULT_NEW_KEY_SPEC
@@ -180,6 +205,7 @@ class MiniCA:
         self.random = random.SystemRandom()
 
     def _run_openssl(self, args, input=None, require_status=0):
+        "Internal: Actually invoke the OpenSSL CLI."
         proc = subprocess.Popen((self.openssl_path,) + tuple(args),
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
@@ -192,6 +218,7 @@ class MiniCA:
         return {'status': status, 'stdout': stdout, 'stderr': stderr}
 
     def _write_and_adjust(self, source, destination, mode, owner, group):
+        "Internal: Write the given data to a file with specified parameters."
         with open(destination, 'w') as df:
             os.chmod(df.fileno(), mode)
             if owner is not None or group is not None:
@@ -200,17 +227,20 @@ class MiniCA:
                 df.write(block)
 
     def _copy_and_adjust(self, source, destination, mode, owner, group):
+        "Internal: Copy the a file to a new location with given parameters."
         with open(source) as sf:
             self._write_and_adjust(iter(lambda: sf.read(4096), ''),
                                    destination, mode, owner, group)
 
     def _silent_remove(self, path):
+        "Internal: Remove a file, ignoring errors."
         try:
             os.remove(path)
         except OSError:
             pass
 
     def _derive_paths(self, basename, detail=None):
+        "Internal: Calculate certificate and private key paths."
         if not VALID_NAME.match(basename):
             raise ValidationError('Invalid {}certificate basename'
                                   .format(detail + ' ' if detail else ''))
@@ -218,7 +248,9 @@ class MiniCA:
                 os.path.join(self.storage_dir, 'key', basename + '.pem'))
 
     def _get_cert_meta(self, filename=None, input=None):
+        "Internal: Retrieve and parse the metadata of the named certificate."
         def decode_rdn(name):
+            "Parse and validate an RDN."
             parts = parse_rdn(name)
             if (len(parts) != 3 or
                     parts[0] != ('O', ORGANIZATION) or
@@ -233,6 +265,7 @@ class MiniCA:
             return (parts[1][1], basename)
 
         def decode_timestamp(text):
+            "Parse a certificate timestamp string."
             return calendar.timegm(email.utils.parsedate(text))
 
         if filename is not None and input is not None:
@@ -266,6 +299,7 @@ class MiniCA:
                 'notAfter': decode_timestamp(raw_data['notAfter'])}
 
     def _collect_chain(self, leaf_basename):
+        "Internal: Gather the certificate chain of the named certificate."
         output = []
         cur_basename = leaf_basename
         while 1:
@@ -279,6 +313,7 @@ class MiniCA:
         return output
 
     def _verify_chain(self, basenames):
+        "Internal: Verify a certificate chain against its root."
         if not basenames:
             return {'status': 'FAIL', 'detail': 'Certificate chain empty?!'}
         cmdline = [
@@ -299,6 +334,7 @@ class MiniCA:
         return {'status': 'FAIL', 'detail': res['stderr']}
 
     def _create_cert(self, cmdline, cert_path, key_path, input=None):
+        "Internal: Create a certificate and chmod its files."
         res = None
         try:
             res = self._run_openssl(cmdline, input)
@@ -316,6 +352,12 @@ class MiniCA:
         return ret
 
     def prepare_storage(self, replace=False):
+        """
+        Create and initialize the certificate store (if necessary).
+
+        If replace is true, any configuration files (of which there currently
+        are none) are replaced regardless of whether they exist.
+        """
         os.makedirs(self.storage_dir, exist_ok=True)
         cert_dir = os.path.join(self.storage_dir, 'cert')
         os.makedirs(cert_dir, exist_ok=True)
@@ -325,7 +367,18 @@ class MiniCA:
         os.chmod(key_dir, 0o700)
 
     def list(self, basenames=None, verbose=False):
+        """
+        Return the names and metadata of the certificates with the given
+        names.
+
+        basenames is a list of certificates to prepare a listing of, or None
+        to list all certificates.
+
+        verbose indicates that listing entries should not only contain names
+        but also metadata.
+        """
         def format_timestamp(ts):
+            "Format a timestamp into a human-readable string."
             return time.strftime('%Y-%m-%d %H:%M:%S Z', time.gmtime(ts))
 
         cert_dir = os.path.join(self.storage_dir, 'cert')
@@ -357,6 +410,9 @@ class MiniCA:
         return {'result': result, 'warnings': warnings}
 
     def create_root(self, basename):
+        """
+        Create a root certificate with the given basename.
+        """
         cert_path, key_path = self._derive_paths(basename)
         if os.path.exists(cert_path):
             raise ValidationError('New certificate basename already in use')
@@ -381,6 +437,7 @@ class MiniCA:
         ), cert_path, key_path)
 
     def _create_derived(self, new_basename, parent_basename, ca):
+        "Internal: Implementation of create_intermediate() and create_leaf()."
         new_cert_path, new_key_path = self._derive_paths(new_basename,
                                                          'new')
         par_cert_path, par_key_path = self._derive_paths(parent_basename,
@@ -431,18 +488,49 @@ class MiniCA:
                 self._silent_remove(new_key_path)
 
     def create_intermediate(self, new_basename, parent_basename):
+        """
+        Create a new intermediate (i.e. CA) certificate with the given
+        basename signed by the given parent certificate.
+        """
         return self._create_derived(new_basename, parent_basename, True)
 
     def create_leaf(self, new_basename, parent_basename):
+        """
+        Create a new leaf (i.e. non-CA) certificate with the given basename
+        signed by the given parent certificate.
+        """
         return self._create_derived(new_basename, parent_basename, False)
 
     def remove(self, basename):
+        """
+        Delete the given certificate.
+        """
         cert_path, key_path = self._derive_paths(basename)
         self._silent_remove(cert_path)
         self._silent_remove(key_path)
 
-    def export(self, basename, cert_dest, chain_dest, root_dest, key_dest,
-               new_owner, new_group):
+    def export(self, basename, cert_dest=None, chain_dest=None,
+               root_dest=None, key_dest=None, new_owner=None, new_group=None):
+        """
+        Copy various data pertaining to the named certificate out of the
+        store.
+
+        cert_dest  is a filesystem path whither to write the certificate.
+        chain_dest is a filesystem path whither to write the certificate's
+                   chain (without the certificate itself and without the
+                   root).
+        root_dest  is a filesystem path whither to write the root of the
+                   certificate's chain.
+        key_dest   is a filesystem path whither to write the certificate's
+                   private key.
+        new_owner  is the name of a user (or a numeric user ID) to assign to
+                   the exported files.
+        new_group  is the name of a group (or a numeric group ID) to assign to
+                   the exported files.
+        If a *_dest parameter is omitted or None, the corresponding file is
+        not written. If new_owner or new_group is omitted or None, the
+        corresponding part of the exported files' metadata is not changed.
+        """
         cert_path, key_path = self._derive_paths(basename)
         chain = self._collect_chain(basename)
         ret = {'status': 'FAIL', 'warnings': ''}
@@ -451,9 +539,10 @@ class MiniCA:
             ret['warnings'] = verification_res['detail']
         cert_written = chain_written = root_written = key_written = False
         try:
-            self._write_and_adjust((chain[0][1],), cert_dest, 0o444,
-                                   new_owner, new_group)
-            cert_written = True
+            if cert_dest is not None:
+                self._write_and_adjust((chain[0][1],), cert_dest, 0o444,
+                                       new_owner, new_group)
+                cert_written = True
             if chain_dest is not None:
                 self._write_and_adjust((p[1] for p in chain[1:-1]),
                                        chain_dest, 0o444,
