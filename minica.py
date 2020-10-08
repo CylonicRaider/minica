@@ -685,7 +685,7 @@ def main():
         help='The name of the certificate to delete.')
     # (Subcommand export.)
     p_export = sp.add_parser('export',
-        help='Copy a certificate (and associated files) from the certificate '
+        help='Copy files associated with a certificate from the certificate '
              'store.')
     p_export.add_argument('--root', '-r', action='store_true',
         help='Export the root of the certificate\'s chain (sub-extension '
@@ -693,6 +693,8 @@ def main():
     p_export.add_argument('--chain', '-c', action='store_true',
         help='Export a chain of intermediate certificates up to (but not '
              'including) the root (sub-extension ".chain").')
+    p_export.add_argument('--certificate', '-s', action='store_true',
+        help='Export the certificate itself (no sub-extension).')
     p_export.add_argument('--key', '-k', action='store_true',
         help='Export the certificate\'s private key (sub-extension ".key").')
     p_export.add_argument('--output', '-o', metavar='<FILENAME>',
@@ -745,12 +747,12 @@ def main():
         elif arguments.action == 'remove':
             ca.remove(arguments.name)
         elif arguments.action == 'export':
-            cert_dest = arguments.output
-            if cert_dest is None: cert_dest = arguments.name + '.pem'
-            chain_dest = derive_export_path(cert_dest, 'chain',
-                                            arguments.chain)
-            root_dest = derive_export_path(cert_dest, 'root', arguments.root)
-            key_dest = derive_export_path(cert_dest, 'key', arguments.key)
+            dest = arguments.output
+            if dest is None: dest = arguments.name + '.pem'
+            cert_dest = dest if arguments.certificate else None
+            chain_dest = derive_export_path(dest, 'chain', arguments.chain)
+            root_dest = derive_export_path(dest, 'root', arguments.root)
+            key_dest = derive_export_path(dest, 'key', arguments.key)
             res = ca.export(arguments.name, cert_dest, chain_dest, root_dest,
                             key_dest, arguments.chown[0], arguments.chown[1])
             if res['warnings']:
