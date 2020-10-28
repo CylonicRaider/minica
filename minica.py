@@ -703,7 +703,7 @@ def main():
              'filename\'s extension (e.g., the private key of "cert.pem" is '
              'stored in "cert.key.pem"). Defaults to the name of the '
              'certificate followed by ".pem".')
-    p_export.add_argument('--chown', metavar='<USER>[:<GROUP>]',
+    p_export.add_argument('--chown', '-U', metavar='<USER>[:<GROUP>]',
         type=chown_spec, default=(None, None),
         help='Change the owner and/or group of the exported files. If '
              '<GROUP> is omitted, it is taken to be the same as <OWNER>. '
