@@ -622,6 +622,12 @@ def main():
             help='The cryptographic hash function to use for signatures.')
         p.add_argument('--days', type=days_in,
             help='How many days the new certificate should be valid for.')
+        p.add_argument('--san', action='append', default=[],
+            help='Subject Alternate Name for the certificate.')
+
+    def get_exts(arguments):
+        "Helper: Extract a certificate extension mapping from arguments."
+        return {'subjectAltName': arguments.san}
 
     def layout_listing(data):
         "Helper: Prepare a certificate listing for columnar output."
@@ -759,12 +765,14 @@ def main():
             for warning in res['warnings']:
                 sys.stderr.write('WARNING: {}\n'.format(warning))
         elif arguments.action == 'new-root':
-            ca.create_root(arguments.name)
+            ca.create_root(arguments.name, exts=get_exts(arguments))
         elif arguments.action == 'new':
             if arguments.ca:
-                ca.create_intermediate(arguments.name, arguments.parent)
+                ca.create_intermediate(arguments.name, arguments.parent,
+                                       exts=get_exts(arguments))
             else:
-                ca.create_leaf(arguments.name, arguments.parent)
+                ca.create_leaf(arguments.name, arguments.parent,
+                               exts=get_exts(arguments))
         elif arguments.action == 'remove':
             ca.remove(arguments.name)
         elif arguments.action == 'export':
