@@ -335,8 +335,23 @@ class MiniCA:
 
     def _encode_extensions(self, exts):
         "Internal: Encode an extension mapping into command-line options."
-        if exts: raise ValidationError('Unrecognized extensions')
-        return ()
+        if not exts: return ()
+        ret = []
+        for key, value in exts.items():
+            if key == 'subjectAltName':
+                for item in value:
+                    if ',' in item:
+                        raise ValidationError('SubjectAltName value has '
+                            'unsupported comma')
+                    elif ':' not in item:
+                        raise ValidationError('SubjectAltName value missing '
+                            'colon')
+                if not value: continue
+                ret.extend(('-addext', 'subjectAltName=' + ','.join(value)))
+            else:
+                raise ValidationError('Unrecognized extension {!r}'
+                                      .format(key))
+        return tuple(ret)
 
     def _create_cert(self, cmdline, cert_path, key_path, input=None):
         "Internal: Create a certificate and chmod its files."
