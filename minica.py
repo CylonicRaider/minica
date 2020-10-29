@@ -333,6 +333,11 @@ class MiniCA:
         if res['status'] == 0: return {'status': 'OK'}
         return {'status': 'FAIL', 'detail': res['stderr']}
 
+    def _encode_extensions(self, exts):
+        "Internal: Encode an extension mapping into command-line options."
+        if exts: raise ValidationError('Unrecognized extensions')
+        return ()
+
     def _create_cert(self, cmdline, cert_path, key_path, input=None):
         "Internal: Create a certificate and chmod its files."
         res = None
@@ -409,7 +414,7 @@ class MiniCA:
             ))
         return {'result': result, 'warnings': warnings}
 
-    def create_root(self, basename):
+    def create_root(self, basename, exts=None):
         """
         Create a root certificate with the given basename.
         """
@@ -434,9 +439,9 @@ class MiniCA:
             '-days', str(self.new_cert_days),
             # Write certificate and key to files.
             '-out', cert_path, '-keyout', key_path
-        ), cert_path, key_path)
+        ) + self._encode_extensions(exts), cert_path, key_path)
 
-    def _create_derived(self, new_basename, parent_basename, ca):
+    def _create_derived(self, new_basename, parent_basename, ca, exts=None):
         "Internal: Implementation of create_intermediate() and create_leaf()."
         new_cert_path, new_key_path = self._derive_paths(new_basename,
                                                          'new')
@@ -461,7 +466,7 @@ class MiniCA:
                 # Write the key to its final location but the request to
                 # standard output.
                 '-keyout', new_key_path
-            ))
+            ) + self._encode_extensions(exts))
             cert_options = (
                 # Sign a certificate request.
                 'x509', '-req',
@@ -487,19 +492,20 @@ class MiniCA:
                 self._silent_remove(new_cert_path)
                 self._silent_remove(new_key_path)
 
-    def create_intermediate(self, new_basename, parent_basename):
+    def create_intermediate(self, new_basename, parent_basename, exts=None):
         """
         Create a new intermediate (i.e. CA) certificate with the given
         basename signed by the given parent certificate.
         """
-        return self._create_derived(new_basename, parent_basename, True)
+        return self._create_derived(new_basename, parent_basename, True, exts)
 
-    def create_leaf(self, new_basename, parent_basename):
+    def create_leaf(self, new_basename, parent_basename, exts=None):
         """
         Create a new leaf (i.e. non-CA) certificate with the given basename
         signed by the given parent certificate.
         """
-        return self._create_derived(new_basename, parent_basename, False)
+        return self._create_derived(new_basename, parent_basename, False,
+                                    exts)
 
     def remove(self, basename):
         """
