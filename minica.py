@@ -664,6 +664,21 @@ def main():
         fmt = ' '.join(['{:<{}}'] * len(widths))
         return fmt, result
 
+    def do_export(basename):
+        "Helper: Actually perform the export of the named certificate."
+        dest = arguments.output
+        if dest is None: dest = basename + '.pem'
+        cert_dest = dest if arguments.certificate else None
+        chain_dest = derive_export_path(dest, 'chain', arguments.chain)
+        root_dest = derive_export_path(dest, 'root', arguments.root)
+        key_dest = derive_export_path(dest, 'key', arguments.key)
+        res = ca.export(basename, cert_dest, chain_dest, root_dest,
+                        key_dest, arguments.chown[0], arguments.chown[1])
+        if res['warnings']:
+            sys.stderr.write('WARNING: Could not validate exported '
+                             'certificate chain:\n' +
+                             res['warnings'])
+
     # Prepare command line parser.
     p = argparse.ArgumentParser(
         description='Simple local X.509 certificate management.')
@@ -707,13 +722,13 @@ def main():
         help='The name of the new certificate.')
     # (Subcommand remove.)
     p_remove = sp.add_parser('remove',
-        help='Delete a certificate.')
-    p_remove.add_argument('name',
-        help='The name of the certificate to delete.')
+        help='Delete one or more certificates.')
+    p_remove.add_argument('name', nargs='+',
+        help='The name of a certificate to delete.')
     # (Subcommand export.)
     p_export = sp.add_parser('export',
-        help='Copy files associated with a certificate from the certificate '
-             'store.')
+        help='Copy files associated with one or more certificates from the '
+             'certificate store.')
     p_export.add_argument('--root', '-r', action='store_true',
         help='Export the root of the certificate\'s chain (sub-extension '
              '".root").')
@@ -728,15 +743,16 @@ def main():
         help='Where to write the certificate. The names of associated files '
              'are derived by inserting certain "sub-extensions" before this '
              'filename\'s extension (e.g., the private key of "cert.pem" is '
-             'stored in "cert.key.pem"). Defaults to the name of the '
+             'stored in "cert.key.pem"). Must not be used when exporting '
+             'multiple certificates at once. Defaults to the name of the '
              'certificate followed by ".pem".')
     p_export.add_argument('--chown', '-U', metavar='<USER>[:<GROUP>]',
         type=chown_spec, default=(None, None),
         help='Change the owner and/or group of the exported files. If '
              '<GROUP> is omitted, it is taken to be the same as <OWNER>. '
              'Either may be the empty string to perform no change.')
-    p_export.add_argument('name',
-        help='The name of the certificate to export.')
+    p_export.add_argument('name', nargs='+',
+        help='The name of a certificate to export.')
     # Parse command line.
     arguments = p.parse_args()
     # Create driver object.
@@ -774,20 +790,14 @@ def main():
                 ca.create_leaf(arguments.name, arguments.parent,
                                exts=get_exts(arguments))
         elif arguments.action == 'remove':
-            ca.remove(arguments.name)
+            for basename in arguments.name:
+                ca.remove(basename)
         elif arguments.action == 'export':
-            dest = arguments.output
-            if dest is None: dest = arguments.name + '.pem'
-            cert_dest = dest if arguments.certificate else None
-            chain_dest = derive_export_path(dest, 'chain', arguments.chain)
-            root_dest = derive_export_path(dest, 'root', arguments.root)
-            key_dest = derive_export_path(dest, 'key', arguments.key)
-            res = ca.export(arguments.name, cert_dest, chain_dest, root_dest,
-                            key_dest, arguments.chown[0], arguments.chown[1])
-            if res['warnings']:
-                sys.stderr.write('WARNING: Could not validate exported '
-                                 'certificate chain:\n' +
-                                 res['warnings'])
+            if len(arguments.name) > 1 and arguments.output is not None:
+                raise SystemExit('ERROR: May not export multiple '
+                    'certificates with --output.')
+            for basename in arguments.name:
+                do_export(basename)
         else:
             raise AssertionError('This should not happen?!')
     except Error as err:
