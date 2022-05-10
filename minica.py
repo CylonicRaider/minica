@@ -14,7 +14,7 @@ import shutil
 import argparse
 import email.utils
 
-VALID_NAME = re.compile(r'^[a-zA-Z0-9._-]+$')
+VALID_NAME = re.compile(r'\A[a-zA-Z0-9._-]+\Z')
 
 ORGANIZATION = 'Local'
 UNIT_ROOT = 'Root'
@@ -28,10 +28,10 @@ DEFAULT_NEW_KEY_SPEC = 'rsa:4096'
 DEFAULT_NEW_CERT_HASH = 'sha256'
 DEFAULT_NEW_CERT_DAYS = 30
 
-PARSE_LINE = re.compile(r'^([a-zA-Z0-9]+)\s*=\s*(.*)$')
+PARSE_LINE = re.compile(r'\A([a-zA-Z0-9]+)\s*=\s*(.*)\Z')
 DAYS_IN_TOKEN = re.compile(r'([+-]?[1-9][0-9]*)([dwmyDWMY])')
 DAYS_IN_PATTERN = re.compile(
-    r'^(?:[+-]?[1-9][0-9]*[dwmyDWMY]\s*)*(?:[+-]?[1-9][0-9]*[dwmyDWMY])$')
+    r'\A(?:[+-]?[1-9][0-9]*[dwmyDWMY]\s*)*(?:[+-]?[1-9][0-9]*[dwmyDWMY])\Z')
 WHITESPACE = re.compile(r'\s+')
 
 class Error(Exception):
