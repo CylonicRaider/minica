@@ -429,14 +429,12 @@ class MiniCA:
             ))
         return {'result': result, 'warnings': warnings}
 
-    def create_root(self, basename, exts=None):
-        """
-        Create a root certificate with the given basename.
-        """
+    def _create_root(self, basename, ca, exts=None):
+        "Internal: Root certificate creation implementation."
         cert_path, key_path = self._derive_paths(basename)
         if os.path.exists(cert_path):
             raise ValidationError('New certificate basename already in use')
-        return self._create_cert((
+        options = (
             # Generate self-signed certificate.
             'req', '-x509',
             # Unencrypted private key.
@@ -454,10 +452,15 @@ class MiniCA:
             '-days', str(self.new_cert_days),
             # Write certificate and key to files.
             '-out', cert_path, '-keyout', key_path
-        ) + self._encode_extensions(exts), cert_path, key_path)
+        )
+        if not ca:
+            # The secion name is mentioned in the openssl-cmp documentation.
+            cert_options += ('-extensions', 'v3_ca')
+        options += self._encode_extensions(exts)
+        return self._create_cert(options, cert_path, key_path)
 
     def _create_derived(self, new_basename, parent_basename, ca, exts=None):
-        "Internal: Implementation of create_intermediate() and create_leaf()."
+        "Internal: Non-root certificate creation implementation."
         new_cert_path, new_key_path = self._derive_paths(new_basename,
                                                          'new')
         par_cert_path, par_key_path = self._derive_paths(parent_basename,
@@ -506,6 +509,12 @@ class MiniCA:
             if not success:
                 self._silent_remove(new_cert_path)
                 self._silent_remove(new_key_path)
+
+    def create_root(self, new_basename, exts=None):
+        """
+        Create a root certificate with the given basename.
+        """
+        return self._create_root(new_basename, True, exts)
 
     def create_intermediate(self, new_basename, parent_basename, exts=None):
         """
