@@ -510,6 +510,21 @@ class MiniCA:
                 self._silent_remove(new_cert_path)
                 self._silent_remove(new_key_path)
 
+    def create(self, new_basename, parent_basename=None, ca=False,
+               exts=None):
+        """
+        Create a certificate.
+
+        If parent_basename is not provided, the certificate will be a root; if
+        ca is true, the certificate will be a CA certificate. exts is a
+        mapping of extensions; presently, only subjectAltName is supported.
+        """
+        if parent_basename is None:
+            return self._create_root(new_basename, ca, exts)
+        else:
+            return self._create_derived(new_basename, parent_basename, ca,
+                                        exts)
+
     def create_root(self, new_basename, exts=None):
         """
         Create a root certificate with the given basename.
