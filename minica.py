@@ -727,19 +727,18 @@ def main():
              'its name).')
     p_list.add_argument('name', nargs='*',
         help='The name of a certificate to display (defaults to all).')
-    # (Subcommand new-root.)
-    p_new_root = sp.add_parser('new-root',
-        help='Create a new root certificate.')
-    add_cert_params(p_new_root)
-    p_new_root.add_argument('name',
-        help='The name of the new certificate.')
     # (Subcommand new.)
     p_new = sp.add_parser('new',
         help='Create a new intermediate or leaf certificate.')
     add_cert_params(p_new)
-    p_new.add_argument('--ca', '-a', action='store_true',
-        help='Create an intermediate (CA) certificate instead of a leaf one.')
-    p_new.add_argument('--parent', '-p', metavar='<NAME>', required=True,
+    p_new.add_argument('--ca', '-a', action='store_const', const=True,
+        help='Create an intermediate (CA) certificate (default if no '
+             '--parent is supplied).')
+    p_new.add_argument('--no-ca', '-l', action='store_const', dest='ca',
+        const=False,
+        help='Create a leaf (non-CA) certificate (default if a --parent is '
+             'supplied).')
+    p_new.add_argument('--parent', '-p', metavar='<NAME>',
         help='The name of the certificate to act as the issuer of the new '
              'one.')
     p_new.add_argument('name',
@@ -804,15 +803,13 @@ def main():
                 print(fmt.format(*row).rstrip())
             for warning in res['warnings']:
                 sys.stderr.write('WARNING: {}\n'.format(warning))
-        elif arguments.action == 'new-root':
-            ca.create_root(arguments.name, exts=get_exts(arguments))
         elif arguments.action == 'new':
-            if arguments.ca:
-                ca.create_intermediate(arguments.name, arguments.parent,
-                                       exts=get_exts(arguments))
+            if arguments.ca is None:
+                ca_cert = (arguments.parent is None)
             else:
-                ca.create_leaf(arguments.name, arguments.parent,
-                               exts=get_exts(arguments))
+                ca_cert = arguments.ca
+            ca.create(arguments.name, arguments.parent, ca_cert,
+                      exts=get_exts(arguments))
         elif arguments.action == 'remove':
             for basename in arguments.name:
                 ca.remove(basename)
