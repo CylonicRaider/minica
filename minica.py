@@ -525,27 +525,6 @@ class MiniCA:
             return self._create_derived(new_basename, parent_basename, ca,
                                         exts)
 
-    def create_root(self, new_basename, exts=None):
-        """
-        Create a root certificate with the given basename.
-        """
-        return self._create_root(new_basename, True, exts)
-
-    def create_intermediate(self, new_basename, parent_basename, exts=None):
-        """
-        Create a new intermediate (i.e. CA) certificate with the given
-        basename signed by the given parent certificate.
-        """
-        return self._create_derived(new_basename, parent_basename, True, exts)
-
-    def create_leaf(self, new_basename, parent_basename, exts=None):
-        """
-        Create a new leaf (i.e. non-CA) certificate with the given basename
-        signed by the given parent certificate.
-        """
-        return self._create_derived(new_basename, parent_basename, False,
-                                    exts)
-
     def remove(self, basename):
         """
         Delete the given certificate.
