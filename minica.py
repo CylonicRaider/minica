@@ -557,10 +557,11 @@ class MiniCA:
         """
         cert_path, key_path = self._derive_paths(basename)
         chain = self._collect_chain(basename)
-        ret = {'status': 'FAIL', 'warnings': ''}
+        ret = {'status': 'FAIL', 'warnings': []}
         verification_res = self._verify_chain([p[0] for p in chain])
         if verification_res['status'] != 'OK':
-            ret['warnings'] = verification_res['detail']
+            ret['warnings'].append('Could not validate exported certificate '
+                'chain:\n' + verification_res['detail'].rstrip('\n'))
         cert_written = chain_written = root_written = key_written = False
         try:
             if cert_dest is not None:
@@ -677,10 +678,8 @@ def main():
         key_dest = derive_export_path(dest, 'key', arguments.key)
         res = ca.export(basename, cert_dest, chain_dest, root_dest,
                         key_dest, arguments.chown[0], arguments.chown[1])
-        if res['warnings']:
-            sys.stderr.write('WARNING: Could not validate exported '
-                             'certificate chain:\n' +
-                             res['warnings'])
+        for warning in res['warnings']:
+            sys.stderr.write('WARNING: {}\n'.format(warning))
 
     # Prepare command line parser.
     p = argparse.ArgumentParser(
