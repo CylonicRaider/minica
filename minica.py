@@ -668,6 +668,11 @@ def main():
         fmt = ' '.join(['{:<{}}'] * len(widths))
         return fmt, result
 
+    def print_warnings(warnings):
+        "Helper: Print out a list of warnings (if any)."
+        for warning in warnings:
+            sys.stderr.write('WARNING: {}\n'.format(warning))
+
     def do_export(basename):
         "Helper: Actually perform the export of the named certificate."
         dest = arguments.output
@@ -678,8 +683,7 @@ def main():
         key_dest = derive_export_path(dest, 'key', arguments.key)
         res = ca.export(basename, cert_dest, chain_dest, root_dest,
                         key_dest, arguments.chown[0], arguments.chown[1])
-        for warning in res['warnings']:
-            sys.stderr.write('WARNING: {}\n'.format(warning))
+        print_warnings(res['warnings'])
 
     # Prepare command line parser.
     p = argparse.ArgumentParser(
@@ -779,8 +783,7 @@ def main():
             fmt, rows = layout_listing(res['result'])
             for row in rows:
                 print(fmt.format(*row).rstrip())
-            for warning in res['warnings']:
-                sys.stderr.write('WARNING: {}\n'.format(warning))
+            print_warnings(res['warnings'])
         elif arguments.action == 'new':
             if arguments.ca is None:
                 ca_cert = (arguments.parent is None)
