@@ -217,14 +217,21 @@ class MiniCA:
                                  .format(status), status, stderr)
         return {'status': status, 'stdout': stdout, 'stderr': stderr}
 
+    def _write_stream(self, source, destination):
+        "Internal: Write the given data to the given file"
+        for block in source:
+            destination.write(block)
+
     def _write_and_adjust(self, source, destination, mode, owner, group):
         "Internal: Write the given data to a file with specified parameters."
+        if not isinstance(destination, str):
+            self._write_stream(source, destination)
+            return
         with open(destination, 'w') as df:
             os.chmod(df.fileno(), mode)
             if owner is not None or group is not None:
                 shutil.chown(df.fileno(), owner, group)
-            for block in source:
-                df.write(block)
+            self._write_stream(source, df)
 
     def _copy_and_adjust(self, source, destination, mode, owner, group):
         "Internal: Copy the a file to a new location with given parameters."
