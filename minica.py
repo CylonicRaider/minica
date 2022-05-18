@@ -241,6 +241,7 @@ class MiniCA:
 
     def _silent_remove(self, path):
         "Internal: Remove a file, ignoring errors."
+        if not isinstance(path, str): return
         try:
             os.remove(path)
         except OSError:
@@ -616,11 +617,12 @@ def chown_spec(s):
     else:
         raise ValueError('Too many colons in new owner specification')
 
-def derive_export_path(filename, subext, condition=True):
-    "Helper: Compute a certificate export result path, or return None."
+def derive_export_dest(filename, subext, condition=True):
+    "Helper: Compute a certificate export result destination, or return None."
     if not condition: return None
+    if not isinstance(filename, str): return filename
     root, ext = os.path.splitext(filename)
-    return '{}.{}{}'.format(root, subext, ext)
+    return ''.join(root, ('.' if subext else ''), subext, ext)
 
 def main():
     "Main function."
@@ -684,10 +686,11 @@ def main():
         "Helper: Actually perform the export of the named certificate."
         dest = arguments.output
         if dest is None: dest = basename + '.pem'
-        cert_dest = dest if arguments.certificate else None
-        chain_dest = derive_export_path(dest, 'chain', arguments.chain)
-        root_dest = derive_export_path(dest, 'root', arguments.root)
-        key_dest = derive_export_path(dest, 'key', arguments.key)
+        if dest == '-': dest = sys.stdout
+        cert_dest = derive_export_dest(dest, '', arguments.certificate)
+        chain_dest = derive_export_dest(dest, 'chain', arguments.chain)
+        root_dest = derive_export_dest(dest, 'root', arguments.root)
+        key_dest = derive_export_dest(dest, 'key', arguments.key)
         res = ca.export(basename, cert_dest, chain_dest, root_dest,
                         key_dest, arguments.chown[0], arguments.chown[1])
         print_warnings(res['warnings'])
@@ -756,8 +759,9 @@ def main():
              'are derived by inserting certain "sub-extensions" before this '
              'filename\'s extension (e.g., the private key of "cert.pem" is '
              'stored in "cert.key.pem"). Must not be used when exporting '
-             'multiple certificates at once. Defaults to the name of the '
-             'certificate followed by ".pem".')
+             'multiple certificates at once. If "-", the files are '
+             'concatenated to standard output instead. Defaults to the name '
+             'of the certificate followed by ".pem".')
     p_export.add_argument('--chown', '-U', metavar='<USER>[:<GROUP>]',
         type=chown_spec, default=(None, None),
         help='Change the owner and/or group of the exported files. If '
