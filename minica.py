@@ -560,8 +560,10 @@ class MiniCA:
         new_group  is the name of a group (or a numeric group ID) to assign to
                    the exported files.
         If a *_dest parameter is omitted or None, the corresponding file is
-        not written. If new_owner or new_group is omitted or None, the
-        corresponding part of the exported files' metadata is not changed.
+        not written. If cert_dest is the same as root_dest and the certificate
+        is self-signed (i.e. its own root), it is only written once. If
+        new_owner or new_group is omitted or None, the corresponding part of
+        the exported files' metadata is not changed.
         """
         cert_path, key_path = self._derive_paths(basename)
         chain = self._collect_chain(basename)
@@ -582,9 +584,11 @@ class MiniCA:
                                        new_owner, new_group)
                 chain_written = True
             if root_dest is not None:
-                self._write_and_adjust((chain[-1][1],), root_dest, 0o444,
-                                       new_owner, new_group)
-                root_written = True
+                # Avoid writing the same certificate to, say, stdout twice.
+                if len(chain) >= 2 or cert_dest is not root_dest:
+                    self._write_and_adjust((chain[-1][1],), root_dest, 0o444,
+                                           new_owner, new_group)
+                    root_written = True
             if key_dest is not None:
                 self._copy_and_adjust(key_path, key_dest, 0o400,
                                       new_owner, new_group)
