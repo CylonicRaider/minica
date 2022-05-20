@@ -379,20 +379,30 @@ class MiniCA:
                 if key_path: self._silent_remove(key_path)
         return ret
 
-    def prepare_storage(self, replace=False):
+    def prepare_storage(self, replace=False, readonly=True):
         """
         Create and initialize the certificate store (if necessary).
 
         If replace is true, any configuration files (of which there currently
         are none) are replaced regardless of whether they exist.
+
+        If readonly is true, the operation will *not* fail if the user has
+        insufficient permissions to modify the storage, but read-only access
+        is still possible.
         """
         os.makedirs(self.storage_dir, exist_ok=True)
         cert_dir = os.path.join(self.storage_dir, 'cert')
         os.makedirs(cert_dir, exist_ok=True)
-        os.chmod(cert_dir, 0o755)
+        try:
+            os.chmod(cert_dir, 0o755)
+        except PermissionError:
+            if not readonly: raise
         key_dir = os.path.join(self.storage_dir, 'key')
         os.makedirs(key_dir, exist_ok=True)
-        os.chmod(key_dir, 0o700)
+        try:
+            os.chmod(key_dir, 0o700)
+        except PermissionError:
+            if not readonly: raise
 
     def list(self, basenames=None, verbose=False):
         """
@@ -713,7 +723,7 @@ def main():
     p_init = sp.add_parser('init',
         help='Initialize the certificate store (and do nothing else).')
     p_init.add_argument('--force', '-f', action='store_true',
-        help='Replace configuration files that may have been modified by '
+        help='Replace configuration files that may have been modified to '
              'pristine copies.')
     # (Subcommand list.)
     p_list = sp.add_parser('list',
@@ -790,7 +800,8 @@ def main():
     # Execute action.
     try:
         prepare_force = getattr(arguments, 'force', False)
-        ca.prepare_storage(prepare_force)
+        prepare_ro = (arguments.action not in ('init', 'new', 'remove'))
+        ca.prepare_storage(prepare_force, prepare_ro)
         if arguments.action == 'init':
             pass
         elif arguments.action == 'list':
