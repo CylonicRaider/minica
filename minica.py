@@ -22,8 +22,9 @@ UNIT_INTERMEDIATE = 'Intermediate'
 UNIT_LEAF = 'Leaf'
 
 OPENSSL_PATH = '/usr/bin/openssl'
-
 STORAGE_DIR = '/etc/minica'
+USER_STORAGE_DIR = '~/.minica'
+
 DEFAULT_NEW_KEY_SPEC = 'rsa:4096'
 DEFAULT_NEW_CERT_HASH = 'sha256'
 DEFAULT_NEW_CERT_DAYS = 30
@@ -712,8 +713,11 @@ def main():
     # Prepare command line parser.
     p = argparse.ArgumentParser(
         description='Simple local X.509 certificate management.')
-    p.add_argument('-S', '--store', metavar='<DIR>',
+    p.add_argument('--store', '-S', metavar='<DIR>',
         help='The location of the certificate store.')
+    p.add_argument('--user', '-U', action='store_const', dest='store',
+        const=Ellipsis,
+        help='Use ' + USER_STORAGE_DIR + ' as the certificate store.')
     p.add_argument('--openssl', metavar='<PATH>',
         help='The location of the openssl executable.')
     sp = p.add_subparsers(dest='action',
@@ -790,6 +794,8 @@ def main():
         'openssl_path': arguments.openssl,
         'storage_dir': arguments.store
     }
+    if arguments.store is Ellipsis:
+        kwargs['storage_dir'] = os.path.expanduser(USER_STORAGE_DIR)
     if hasattr(arguments, 'key_spec'):
         kwargs.update(
             new_key_spec=arguments.key_spec,
