@@ -10,7 +10,7 @@ import random
 import stat
 import calendar, datetime
 import subprocess
-import shutil
+import shutil, shlex
 import argparse
 import email.utils
 
@@ -164,6 +164,14 @@ def parse_days_in(spec, base=None):
         raise ValueError('Invalid days-in specification (has trailing '
             'junk): {}'.format(spec))
     return cur
+
+def format_shell_line(argv):
+    """
+    Helper: Format the given arguments as a shell command line.
+
+    This is *only* used for the dry-run mode.
+    """
+    return ' '.join(shlex.quote(a) for a in argv)
 
 class MiniCA:
     """
