@@ -176,12 +176,12 @@ def format_shell_line(argv):
 class MiniCA:
     """
     MiniCA(openssl_path=None, storage_dir=None, new_key_spec=None,
-        new_cert_hash=None, new_cert_days=None) -> new instance
+        new_cert_hash=None, new_cert_days=None, **kwargs) -> new instance
 
     Certificate manager backed by the OpenSSL command-line interface.
 
-    The constructor arguments specify various configuration values; they
-    default to similarly-named module-level constants:
+    The constructor arguments specify various configuration values; most of
+    them they default to similarly-named module-level constants:
     openssl_path : Where the OpenSSL CLI binary is located. (OPEENSSL_PATH)
     storage_dir  : Where the certificate and key store should be located,
                    as a filesystem path. (STORAGE_DIR)
@@ -191,6 +191,8 @@ class MiniCA:
                    certificate signatures. (DEFAULT_NEW_CERT_HASH)
     new_cert_days: How long a new certificate should be valid, in days, as an
                    integer. (DEFAULT_NEW_CERT_DAYS)
+    dry_run      : Instead of performing actions, print equivalent shell
+                   commands. (Defaults to False.)
     The arguments (after default value substitution) are stored as same-named
     instance attributes.
 
@@ -199,7 +201,7 @@ class MiniCA:
     """
 
     def __init__(self, openssl_path=None, storage_dir=None, new_key_spec=None,
-                 new_cert_hash=None, new_cert_days=None):
+                 new_cert_hash=None, new_cert_days=None, dry_run=False):
         "Instance initializer; see the class docstring for details."
         if openssl_path is None: openssl_path = OPENSSL_PATH
         if storage_dir is None: storage_dir = STORAGE_DIR
@@ -211,6 +213,7 @@ class MiniCA:
         self.new_key_spec = new_key_spec
         self.new_cert_hash = new_cert_hash
         self.new_cert_days = new_cert_days
+        self.dry_run = dry_run
         self.random = random.SystemRandom()
 
     def _run_openssl(self, args, input=None, require_status=0):
