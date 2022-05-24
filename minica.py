@@ -218,7 +218,11 @@ class MiniCA:
 
     def _run_openssl(self, args, input=None, require_status=0):
         "Internal: Actually invoke the OpenSSL CLI."
-        proc = subprocess.Popen((self.openssl_path,) + tuple(args),
+        full_args = (self.openssl_path,) + tuple(args)
+        if self.dry_run:
+            print(format_shell_line(full_args))
+            return
+        proc = subprocess.Popen(full_args,
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
                                 universal_newlines=True)
