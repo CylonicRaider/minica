@@ -233,6 +233,35 @@ class MiniCA:
                                  .format(status), status, stderr)
         return {'status': status, 'stdout': stdout, 'stderr': stderr}
 
+    def _drlog_name_file(self, fp):
+        "Internal: Convert a thing that denotes a file into a string name."
+        if isinstance(fp, str):
+            return fp
+        elif isinstance(fp.name, int):
+            return '/dev/fd/{}'.format(fp.name)
+        else:
+            return str(fp.name)
+
+    def _drlog_copy(self, source, destination):
+        "Internal: Produce a dry-run log of copying source to destination."
+        source_name = self._drlog_name_file(source)
+        dest_name = self._drlog_name_file(destination)
+        print(format_shell_line('cp', source_name, dest_name))
+
+    def _drlog_setmode(self, location, mode, owner, group):
+        "Internal: Produce a dry-run log of adjusting destination's metadata."
+        loc_name = selfg._drlog_name_file(location)
+        if mode is not None:
+            print(format_shell_line('chmod', '{:04o}'.format(mode), loc_name))
+        if owner is not None and group is not None:
+            print(format_shell_line('chown', '--', '{}:{}'.format(owner,
+                                                                  group),
+                                    loc_name))
+        elif owner is not None:
+            print(format_shell_line('chown', '--', str(owner), loc_name))
+        elif group is not None:
+            print(format_shell_line('chgrp', '--', str(group), loc_name))
+
     def _write_stream(self, source, destination):
         "Internal: Write the given data to the given file"
         for block in source:
@@ -240,6 +269,10 @@ class MiniCA:
 
     def _write_and_adjust(self, source, destination, mode, owner, group):
         "Internal: Write the given data to a file with specified parameters."
+        if self.dry_run:
+            self._drlog_copy(source, destination)
+            self._drlog_setmode(destination, mode, owner, group)
+            return
         if not isinstance(destination, str):
             self._write_stream(source, destination)
             return
@@ -251,6 +284,10 @@ class MiniCA:
 
     def _copy_and_adjust(self, source, destination, mode, owner, group):
         "Internal: Copy the a file to a new location with given parameters."
+        if self.dry_run:
+            self._drlog_copy(source, destination)
+            self._drlog_setmode(destination, mode, owner, group)
+            return
         with open(source) as sf:
             self._write_and_adjust(iter(lambda: sf.read(4096), ''),
                                    destination, mode, owner, group)
