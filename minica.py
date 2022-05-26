@@ -294,7 +294,11 @@ class MiniCA:
 
     def _silent_remove(self, path):
         "Internal: Remove a file, ignoring errors."
-        if not isinstance(path, str): return
+        if not isinstance(path, str):
+            return
+        if self.dry_run:
+            print(format_shell_line('rm', '-f', '--', path))
+            return
         try:
             os.remove(path)
         except OSError:
@@ -421,10 +425,16 @@ class MiniCA:
             res = self._run_openssl(cmdline, input)
             ret = {'status': 'OK'}
             if cert_path:
-                os.chmod(cert_path, 0o444)
+                if self.dry_run:
+                    print(format_shell_line('chmod', '0444', cert_path))
+                else:
+                    os.chmod(cert_path, 0o444)
                 ret['cert_path'] = cert_path
             if key_path:
-                os.chmod(key_path, 0o400)
+                if self.dry_run:
+                    print(format_shell_line('chmod', '0400', key_path))
+                else:
+                    os.chmod(key_path, 0o400)
                 ret['key_path'] = key_path
         finally:
             if not res:
