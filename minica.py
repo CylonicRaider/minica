@@ -165,7 +165,7 @@ def parse_days_in(spec, base=None):
             'junk): {}'.format(spec))
     return cur
 
-def format_shell_line(argv):
+def format_shell_line(*argv):
     """
     Helper: Format the given arguments as a shell command line.
 
@@ -220,7 +220,7 @@ class MiniCA:
         "Internal: Actually invoke the OpenSSL CLI."
         full_args = (self.openssl_path,) + tuple(args)
         if self.dry_run:
-            print(format_shell_line(full_args))
+            print(format_shell_line(*full_args))
             return
         proc = subprocess.Popen(full_args,
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
