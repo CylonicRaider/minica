@@ -453,6 +453,8 @@ class MiniCA:
         insufficient permissions to modify the storage, but read-only access
         is still possible.
         """
+        if self.dry_run:
+            return
         os.makedirs(self.storage_dir, exist_ok=True)
         cert_dir = os.path.join(self.storage_dir, 'cert')
         os.makedirs(cert_dir, exist_ok=True)
