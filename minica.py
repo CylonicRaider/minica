@@ -221,7 +221,7 @@ class MiniCA:
         full_args = (self.openssl_path,) + tuple(args)
         if self.dry_run:
             print(format_shell_line(*full_args))
-            return
+            return {'status': 0, 'stdout': '', 'stderr': ''}
         proc = subprocess.Popen(full_args,
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
