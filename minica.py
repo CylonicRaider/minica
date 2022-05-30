@@ -784,6 +784,8 @@ def main():
         help='Use ' + USER_STORAGE_DIR + ' as the certificate store.')
     p.add_argument('--openssl', metavar='<PATH>',
         help='The location of the openssl executable.')
+    p.add_argument('--dry-run', '-n', action='store_true',
+        help='Print equivalent shell commands instead of doing things.')
     sp = p.add_subparsers(dest='action',
         description='The action to perform.')
     sp.required = True
@@ -856,7 +858,8 @@ def main():
     # Create driver object.
     kwargs = {
         'openssl_path': arguments.openssl,
-        'storage_dir': arguments.store
+        'storage_dir': arguments.store,
+        'dry_run': arguments.dry_run
     }
     if arguments.store is Ellipsis:
         kwargs['storage_dir'] = os.path.expanduser(USER_STORAGE_DIR)
