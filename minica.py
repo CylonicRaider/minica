@@ -173,6 +173,30 @@ def format_shell_line(*argv):
     """
     return ' '.join(shlex.quote(a) for a in argv)
 
+class OSAccess:
+    """
+    OSAccess() -> new instance
+
+    Central object for accessing various OS functions.
+    """
+
+    def run_process(self, argv, input=None):
+        """
+        Run the given external program with the given input.
+
+        argv is a sequence of the executable name and additional parameters.
+        input is a (Unicode) string of to be piped into the process' standard
+        input. Returns a dictionary with the following items:
+        status: The exit status of the process.
+        stdout: The process' standard output as a (Unicode) string.
+        stderr: The process' standard error as a (Unicode) string.
+        """
+        proc = subprocess.Popen(argv, stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            universal_newlines=True)
+        stdout, stderr = proc.communicate(input)
+        return {'status': proc.wait(), 'stdout': stdout, 'stderr': stderr}
+
 class MiniCA:
     """
     MiniCA(openssl_path=None, storage_dir=None, new_key_spec=None,
