@@ -5,11 +5,10 @@
 Simple local X.509 certificate management.
 """
 
-import sys, os, re, time
-import random
-import stat
+import sys, os, io, re, time
+import contextlib, random
 import calendar, datetime
-import subprocess
+import stat, subprocess
 import shutil, shlex
 import argparse
 import email.utils
@@ -196,6 +195,33 @@ class OSAccess:
             universal_newlines=True)
         stdout, stderr = proc.communicate(input)
         return {'status': proc.wait(), 'stdout': stdout, 'stderr': stderr}
+
+    def copy_file(self, source, destination):
+        """
+        Copy the given file to the given path.
+
+        source is one of:
+        - A string denoting the location of a file.
+        - An io.IOBase instance to extract data from.
+        - An iterable yielding strings representing the file's contents.
+
+        destination is one of:
+        - A string denoting the location of a file.
+        - An io.IOBase instance to write into.
+        """
+        def file_to_blocks(fp):
+            "Helper: Produce a sequence of successive blocks read from fp."
+            return iter(lambda: fp.read(4096), '')
+
+        with contextlib.ExitStack() as stack:
+            if isinstance(source, str):
+                source = stack.enter_context(open(source))
+            if isinstance(source, io.IOBase):
+                source = file_to_blocks(source)
+            if isinstance(destination, str):
+                destination = stack.enter_context(open(destination))
+            for block in source:
+                destination.write(block)
 
 class MiniCA:
     """
