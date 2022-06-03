@@ -196,7 +196,7 @@ class OSAccess:
         stdout, stderr = proc.communicate(input)
         return {'status': proc.wait(), 'stdout': stdout, 'stderr': stderr}
 
-    def copy_file(self, source, destination):
+    def copy_file(self, source, destination, adjust_dest=None):
         """
         Copy the given file to the given path.
 
@@ -208,6 +208,10 @@ class OSAccess:
         destination is one of:
         - A string denoting the location of a file.
         - An io.IOBase instance to write into.
+
+        If adjust_dest is not None, it is passed as keyword arguments to
+        set_file_status() to change certain parameters of the destination
+        file (see there for details).
         """
         def file_to_blocks(fp):
             "Helper: Produce a sequence of successive blocks read from fp."
@@ -220,8 +224,39 @@ class OSAccess:
                 source = file_to_blocks(source)
             if isinstance(destination, str):
                 destination = stack.enter_context(open(destination))
+
+            if adjust_dest is not None:
+                self.set_file_status(destination, **adjust_dest)
+
             for block in source:
                 destination.write(block)
+
+    def set_file_status(self, fp, mode=None, owner=None, group=None):
+        """
+        Set the access mode, owner, and/or group of the given file.
+
+        fp may be one of:
+        - A string denoting the path of a file.
+        - An io.IOBase object (with a working fileno() method) denoting the
+          file.
+        - An integer file descriptor.
+
+        mode, if not None, is the access mode to configure on the file via
+        chmod.
+
+        owner and group, if not None, are the owner and/or group to change the
+        file to via chown. Either or both of owner and group may be omitted.
+        """
+        with contextlib.ExitStack() as stack:
+            if isinstance(fp, str):
+                fp = stack.enter_context(open(fp, 'r+'))
+            if isinstance(fp, io.IOBase):
+                fp = fp.fileno()
+
+            if mode is not None:
+                os.chmod(fp, mode)
+            if owner is not None or group is not None:
+                shutil.chown(fp, owner, group)
 
 class MiniCA:
     """
