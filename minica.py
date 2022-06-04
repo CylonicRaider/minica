@@ -223,7 +223,7 @@ class OSAccess:
             if isinstance(source, io.IOBase):
                 source = file_to_blocks(source)
             if isinstance(destination, str):
-                destination = stack.enter_context(open(destination))
+                destination = stack.enter_context(open(destination, 'w'))
 
             if adjust_dest is not None:
                 self.set_file_status(destination, **adjust_dest)
