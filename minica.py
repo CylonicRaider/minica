@@ -174,10 +174,30 @@ def format_shell_line(*argv):
 
 class OSAccess:
     """
-    OSAccess() -> new instance
+    OSAccess(dry_run=False) -> new instance
 
     Central object for accessing various OS functions.
+
+    If dry_run is true, no actual operations are performed, and equivalent
+    shell commands are printed instead.
     """
+
+    def __init__(self, dry_run=False):
+        "Instance initializer; see the class docstring for details."
+        self.dry_run = dry_run
+
+    def _describe_file(self, fp):
+        "Internal: Return a dry-run logging name for the given file."
+        if isinstance(fp, str):
+            return fp
+        elif isinstance(fp, int):
+            return '/dev/fd/{}'.format(fp)
+        elif not isinstance(fp, io.IOBase):
+            return '/dev/unknown'
+        elif hasattr(fp, 'name') and not isinstance(fp.name, int):
+            return fp.name
+        else:
+            return '/dev/fd/{}'.format(fp.name)
 
     def run_process(self, argv, input=None):
         """
@@ -190,6 +210,10 @@ class OSAccess:
         stdout: The process' standard output as a (Unicode) string.
         stderr: The process' standard error as a (Unicode) string.
         """
+        if self.dry_run:
+            print(format_shell_line(*argv))
+            return {'status': 0, 'stdout': '', 'stderr': ''}
+
         proc = subprocess.Popen(argv, stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             universal_newlines=True)
@@ -216,6 +240,13 @@ class OSAccess:
         def file_to_blocks(fp):
             "Helper: Produce a sequence of successive blocks read from fp."
             return iter(lambda: fp.read(4096), '')
+
+        if self.dry_run:
+            print(format_shell_line('cp', '--', self._describe_file(source),
+                                    self._describe_file(destination)))
+            if adjust_dest is not None:
+                self.set_file_status(destination, **adjust_Dest)
+            return
 
         with contextlib.ExitStack() as stack:
             if isinstance(source, str):
@@ -247,6 +278,20 @@ class OSAccess:
         owner and group, if not None, are the owner and/or group to change the
         file to via chown. Either or both of owner and group may be omitted.
         """
+        if self.dry_run:
+            fp_desc = self._describe_file(fp)
+            if mode is not None:
+                print(format_shell_line('chmod', '{:04o}'.format(mode),
+                                        '--', fp_desc))
+            if owner is not None and group is not None:
+                print(format_shell_line('chown', '{}:{}'.format(owner, group),
+                                        '--', fp_desc))
+            elif owner is not None:
+                print(format_shell_line('chown', owner, '--', fp_desc))
+            elif group is not None:
+                print(format_shell_line('chgrp', group, '--', fp_desc))
+            return
+
         with contextlib.ExitStack() as stack:
             if isinstance(fp, str):
                 fp = stack.enter_context(open(fp, 'r+'))
