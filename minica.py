@@ -303,6 +303,21 @@ class OSAccess:
             if owner is not None or group is not None:
                 shutil.chown(fp, owner, group)
 
+    def remove_file(self, path):
+        """
+        Silently remove the given file.
+
+        path is a string denoting the location of the file to be removed.
+        """
+        if self.dry_run:
+            print(format_shell_line('rm', '-f', '--', path))
+            return
+
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
 class MiniCA:
     """
     MiniCA(openssl_path=None, storage_dir=None, new_key_spec=None,
