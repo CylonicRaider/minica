@@ -164,13 +164,44 @@ def parse_days_in(spec, base=None):
             'junk): {}'.format(spec))
     return cur
 
+class ShellMarkup(str):
+    """
+    A marker subclass of str denoting text that should be included into shell
+    lines verbatim.
+
+    See the static method build_line() for the actual shell line building.
+
+    This should only be used for dry-run logging.
+    """
+
+    @classmethod
+    def quote(cls, s):
+        """
+        Helper: Quote the given string suitably for shell line inclusion.
+
+        ShellMarkup instances are left unmodified (corresponding to their
+        semantics); bare strings are subjected to shlex.quote().
+        """
+        if isinstance(s, cls): return s
+        return cls(shlex.quote(s))
+
+    @classmethod
+    def build_line(cls, *argv):
+        """
+        Helper: Format the given arguments as a shell command line.
+
+        argv is a sequence of either strings or ShellMarkup instances. The
+        formers are quoted, the latters are left unmodified.
+        """
+        return ShellMarkup(' '.join(cls.quote(a) for a in argv))
+
 def format_shell_line(*argv):
     """
     Helper: Format the given arguments as a shell command line.
 
-    This is *only* used for the dry-run mode.
+    This should only be used for dry-run logging.
     """
-    return ' '.join(shlex.quote(a) for a in argv)
+    return ShellMarkup.build_line(*argv)
 
 class OSAccess:
     """
