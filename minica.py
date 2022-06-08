@@ -258,7 +258,7 @@ class OSAccess:
         source is one of:
         - A string denoting the location of a file.
         - An io.IOBase instance to extract data from.
-        - An iterable yielding strings representing the file's contents.
+        - A tuple/list of the above (contents are concatenated).
 
         destination is one of:
         - A string denoting the location of a file.
@@ -268,30 +268,37 @@ class OSAccess:
         set_file_status() to change certain parameters of the destination
         file (see there for details).
         """
-        def file_to_blocks(fp):
-            "Helper: Produce a sequence of successive blocks read from fp."
-            return iter(lambda: fp.read(4096), '')
+        if not isinstance(source, (tuple, list)):
+            source = (source,)
 
         if self.dry_run:
-            print(format_shell_line('cp', '--', self._describe_file(source),
-                                    self._describe_file(destination)))
+            dest_desc = self._describe_file(destination)
+            if len(source) == 0:
+                print(format_shell_line('touch', '--', dest_desc))
+            if len(source) == 1:
+                print(format_shell_line('cp', '--',
+                    self._describe_file(source[0]), dest_desc))
+            else:
+                print(format_shell_line(*(('cat', '--') +
+                    tuple(self._describe_file(item) for item in source) +
+                    (ShellMarkup('>'), dest_desc))))
             if adjust_dest is not None:
                 self.set_file_status(destination, **adjust_Dest)
             return
 
         with contextlib.ExitStack() as stack:
-            if isinstance(source, str):
-                source = stack.enter_context(open(source))
-            if isinstance(source, io.IOBase):
-                source = file_to_blocks(source)
             if isinstance(destination, str):
                 destination = stack.enter_context(open(destination, 'w'))
 
             if adjust_dest is not None:
                 self.set_file_status(destination, **adjust_dest)
 
-            for block in source:
-                destination.write(block)
+            for item in source:
+                with contextlib.ExitStack() as substack:
+                    if isinstance(item, str):
+                        item = substack.enter_context(open(item))
+                    for block in iter(lambda: item.read(4096), ''):
+                        destination.write(block)
 
     def set_file_status(self, fp, mode=None, owner=None, group=None):
         """
