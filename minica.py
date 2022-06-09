@@ -884,7 +884,7 @@ def derive_export_dest(filename, subext, condition=True):
     if not condition: return None
     if not isinstance(filename, str): return filename
     root, ext = os.path.splitext(filename)
-    return ''.join(root, ('.' if subext else ''), subext, ext)
+    return ''.join((root, ('.' if subext else ''), subext, ext))
 
 def main():
     "Main function."
