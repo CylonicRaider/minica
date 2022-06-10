@@ -230,20 +230,25 @@ class OSAccess:
         else:
             return '/dev/fd/{}'.format(fp.name)
 
-    def run_process(self, argv, input=None):
+    def run_process(self, argv, input=None, override_dry_run=False):
         """
         Run the given external program with the given input.
 
         argv is a sequence of the executable name and additional parameters.
         input is a (Unicode) string of to be piped into the process' standard
-        input. Returns a dictionary with the following items:
+        input.
+        override_dry_run, if true, actually invokes the process even in
+        dry-run mode; this should only be used for reading out information.
+
+        Returns a dictionary with the following items:
         status: The exit status of the process.
         stdout: The process' standard output as a (Unicode) string.
         stderr: The process' standard error as a (Unicode) string.
         """
         if self.dry_run:
             print(format_shell_line(*argv))
-            return {'status': 0, 'stdout': '', 'stderr': ''}
+            if not override_dry_run:
+                return {'status': 0, 'stdout': '', 'stderr': ''}
 
         proc = subprocess.Popen(argv, stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
