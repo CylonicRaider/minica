@@ -288,7 +288,7 @@ class OSAccess:
                     tuple(self._describe_file(item) for item in source) +
                     (ShellMarkup('>'), dest_desc))))
             if adjust_dest is not None:
-                self.set_file_status(destination, **adjust_Dest)
+                self.set_file_status(destination, **adjust_dest)
             return
 
         with contextlib.ExitStack() as stack:
