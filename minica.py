@@ -280,7 +280,7 @@ class OSAccess:
             dest_desc = self._describe_file(destination)
             if len(source) == 0:
                 print(format_shell_line('touch', '--', dest_desc))
-            if len(source) == 1:
+            elif len(source) == 1:
                 print(format_shell_line('cp', '--',
                     self._describe_file(source[0]), dest_desc))
             else:
