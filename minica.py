@@ -529,6 +529,8 @@ class MiniCA:
             'x509',
             # Do not output it again.
             '-noout',
+            # Output RDNs in a format we recognize.
+            '-nameopt', 'compat',
             # Print out the subject and issuer.
             '-subject', '-issuer',
             # ...As well as the notBefore and notAfter dates.
