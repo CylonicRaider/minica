@@ -401,96 +401,25 @@ class MiniCA:
         self.new_key_spec = new_key_spec
         self.new_cert_hash = new_cert_hash
         self.new_cert_days = new_cert_days
-        self.dry_run = dry_run
+        self.os = OSAccess(dry_run)
         self.random = random.SystemRandom()
 
-    def _run_openssl(self, args, input=None, require_status=0):
+    def _run_openssl(self, args, input=None, require_status=0,
+                     override_dry_run=False):
         "Internal: Actually invoke the OpenSSL CLI."
-        full_args = (self.openssl_path,) + tuple(args)
-        if self.dry_run:
-            print(format_shell_line(*full_args))
-            return {'status': 0, 'stdout': '', 'stderr': ''}
-        proc = subprocess.Popen(full_args,
-                                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE,
-                                universal_newlines=True)
-        stdout, stderr = proc.communicate(input)
-        status = proc.wait()
-        if require_status is not None and status != require_status:
+        result = self.os.run_process((self.openssl_path,) + tuple(args),
+                                     input, override_dry_run=override_dry_run)
+        if require_status is not None and result['status'] != require_status:
             raise ExecutionError('openssl exited with unexpected status {}'
-                                 .format(status), status, stderr)
-        return {'status': status, 'stdout': stdout, 'stderr': stderr}
-
-    def _drlog_name_file(self, fp):
-        "Internal: Convert a thing that denotes a file into a string name."
-        if isinstance(fp, str):
-            return fp
-        elif isinstance(fp.name, int):
-            return '/dev/fd/{}'.format(fp.name)
-        else:
-            return str(fp.name)
-
-    def _drlog_copy(self, source, destination):
-        "Internal: Produce a dry-run log of copying source to destination."
-        source_name = self._drlog_name_file(source)
-        dest_name = self._drlog_name_file(destination)
-        print(format_shell_line('cp', source_name, dest_name))
-
-    def _drlog_setmode(self, location, mode, owner, group):
-        "Internal: Produce a dry-run log of adjusting destination's metadata."
-        loc_name = selfg._drlog_name_file(location)
-        if mode is not None:
-            print(format_shell_line('chmod', '{:04o}'.format(mode), loc_name))
-        if owner is not None and group is not None:
-            print(format_shell_line('chown', '--', '{}:{}'.format(owner,
-                                                                  group),
-                                    loc_name))
-        elif owner is not None:
-            print(format_shell_line('chown', '--', str(owner), loc_name))
-        elif group is not None:
-            print(format_shell_line('chgrp', '--', str(group), loc_name))
-
-    def _write_stream(self, source, destination):
-        "Internal: Write the given data to the given file"
-        for block in source:
-            destination.write(block)
-
-    def _write_and_adjust(self, source, destination, mode, owner, group):
-        "Internal: Write the given data to a file with specified parameters."
-        if self.dry_run:
-            self._drlog_copy(source, destination)
-            self._drlog_setmode(destination, mode, owner, group)
-            return
-        if not isinstance(destination, str):
-            self._write_stream(source, destination)
-            return
-        with open(destination, 'w') as df:
-            os.chmod(df.fileno(), mode)
-            if owner is not None or group is not None:
-                shutil.chown(df.fileno(), owner, group)
-            self._write_stream(source, df)
-
-    def _copy_and_adjust(self, source, destination, mode, owner, group):
-        "Internal: Copy the a file to a new location with given parameters."
-        if self.dry_run:
-            self._drlog_copy(source, destination)
-            self._drlog_setmode(destination, mode, owner, group)
-            return
-        with open(source) as sf:
-            self._write_and_adjust(iter(lambda: sf.read(4096), ''),
-                                   destination, mode, owner, group)
+                                     .format(result['status']),
+                                 result['status'], result['stderr'])
+        return result
 
     def _silent_remove(self, path):
         "Internal: Remove a file, ignoring errors."
         if not isinstance(path, str):
             return
-        if self.dry_run:
-            print(format_shell_line('rm', '-f', '--', path))
-            return
-        try:
-            os.remove(path)
-        except OSError:
-            pass
+        self.os.remove_file(path)
 
     def _derive_paths(self, basename, detail=None):
         "Internal: Calculate certificate and private key paths."
@@ -539,7 +468,7 @@ class MiniCA:
         if filename is not None:
             # Read input from the given file.
             cmdline += ('-in', filename)
-        res = self._run_openssl(cmdline, input)
+        res = self._run_openssl(cmdline, input, override_dry_run=True)
         raw_data = {}
         for line in res['stdout'].split('\n'):
             if not line: continue
@@ -584,7 +513,8 @@ class MiniCA:
             ))
         # And verify this certificate.
         cmdline.append(self._derive_paths(basenames[0], 'leaf')[0])
-        res = self._run_openssl(cmdline, require_status=None)
+        res = self._run_openssl(cmdline, require_status=None,
+                                override_dry_run=True)
         if res['status'] == 0: return {'status': 'OK'}
         return {'status': 'FAIL', 'detail': res['stderr']}
 
@@ -615,16 +545,10 @@ class MiniCA:
             res = self._run_openssl(cmdline, input)
             ret = {'status': 'OK'}
             if cert_path:
-                if self.dry_run:
-                    print(format_shell_line('chmod', '0444', cert_path))
-                else:
-                    os.chmod(cert_path, 0o444)
+                self.os.set_file_status(cert_path, mode=0o444)
                 ret['cert_path'] = cert_path
             if key_path:
-                if self.dry_run:
-                    print(format_shell_line('chmod', '0400', key_path))
-                else:
-                    os.chmod(key_path, 0o400)
+                self.os.set_file_status(key_path, mode=0o400)
                 ret['key_path'] = key_path
         finally:
             if not res:
@@ -643,7 +567,7 @@ class MiniCA:
         insufficient permissions to modify the storage, but read-only access
         is still possible.
         """
-        if self.dry_run:
+        if self.os.dry_run:
             return
         os.makedirs(self.storage_dir, exist_ok=True)
         cert_dir = os.path.join(self.storage_dir, 'cert')
@@ -830,33 +754,41 @@ class MiniCA:
         new_owner or new_group is omitted or None, the corresponding part of
         the exported files' metadata is not changed.
         """
+        ret = {'status': 'FAIL', 'warnings': []}
+
         cert_path, key_path = self._derive_paths(basename)
         chain = self._collect_chain(basename)
-        ret = {'status': 'FAIL', 'warnings': []}
+
         verification_res = self._verify_chain([p[0] for p in chain])
         if verification_res['status'] != 'OK':
             ret['warnings'].append('Could not validate exported certificate '
                 'chain:\n' + verification_res['detail'].rstrip('\n'))
+
+        cert_dir = os.path.join(self.storage_dir, 'cert')
+        adjust = {'owner': new_owner, 'group': new_group}
         cert_written = chain_written = root_written = key_written = False
         try:
             if cert_dest is not None:
-                self._write_and_adjust((chain[0][1],), cert_dest, 0o444,
-                                       new_owner, new_group)
+                self.os.copy_file(self._derive_paths(chain[0][0])[0],
+                                  cert_dest,
+                                  adjust_dest=dict(adjust, mode=0o444))
                 cert_written = True
             if chain_dest is not None:
-                self._write_and_adjust((p[1] for p in chain[1:-1]),
-                                       chain_dest, 0o444,
-                                       new_owner, new_group)
+                self.os.copy_file([self._derive_paths(p[0])[0]
+                                   for p in chain[1:-1]],
+                                  chain_dest,
+                                  adjust_dest=dict(adjust, mode=0o444))
                 chain_written = True
             if root_dest is not None:
                 # Avoid writing the same certificate to, say, stdout twice.
                 if len(chain) >= 2 or cert_dest is not root_dest:
-                    self._write_and_adjust((chain[-1][1],), root_dest, 0o444,
-                                           new_owner, new_group)
+                    self.os.copy_file(self._derive_paths(chain[-1][0])[0],
+                                      root_dest,
+                                      adjust_dest=dict(adjust, mode=0o444))
                     root_written = True
             if key_dest is not None:
-                self._copy_and_adjust(key_path, key_dest, 0o400,
-                                      new_owner, new_group)
+                self.os.copy_file(key_path, key_dest,
+                                  adjust_dest=dict(adjust, mode=0o400))
                 key_written = True
             ret['status'] = 'OK'
         finally:
