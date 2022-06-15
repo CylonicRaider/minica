@@ -488,10 +488,8 @@ class MiniCA:
         cur_basename = leaf_basename
         while 1:
             cur_path = self._derive_paths(cur_basename)[0]
-            with open(cur_path) as f:
-                cur_data = f.read()
-            output.append((cur_basename, cur_data))
-            cur_parent = self._get_cert_meta(input=cur_data)['issuer'][1]
+            output.append((cur_basename, cur_path))
+            cur_parent = self._get_cert_meta(filename=cur_path)['issuer'][1]
             if cur_parent == cur_basename: break
             cur_basename = cur_parent
         return output
@@ -769,21 +767,17 @@ class MiniCA:
         cert_written = chain_written = root_written = key_written = False
         try:
             if cert_dest is not None:
-                self.os.copy_file(self._derive_paths(chain[0][0])[0],
-                                  cert_dest,
+                self.os.copy_file(chain[0][1], cert_dest,
                                   adjust_dest=dict(adjust, mode=0o444))
                 cert_written = True
             if chain_dest is not None:
-                self.os.copy_file([self._derive_paths(p[0])[0]
-                                   for p in chain[1:-1]],
-                                  chain_dest,
+                self.os.copy_file([p[1] for p in chain[1:-1]], chain_dest,
                                   adjust_dest=dict(adjust, mode=0o444))
                 chain_written = True
             if root_dest is not None:
                 # Avoid writing the same certificate to, say, stdout twice.
                 if len(chain) >= 2 or cert_dest is not root_dest:
-                    self.os.copy_file(self._derive_paths(chain[-1][0])[0],
-                                      root_dest,
+                    self.os.copy_file(chain[-1][1], root_dest,
                                       adjust_dest=dict(adjust, mode=0o444))
                     root_written = True
             if key_dest is not None:
