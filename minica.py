@@ -429,7 +429,7 @@ class MiniCA:
         return (os.path.join(self.storage_dir, 'cert', basename + '.pem'),
                 os.path.join(self.storage_dir, 'key', basename + '.pem'))
 
-    def _get_cert_meta(self, filename=None, input=None):
+    def _get_cert_meta(self, filename):
         "Internal: Retrieve and parse the metadata of the named certificate."
         def decode_rdn(name):
             "Parse and validate an RDN."
@@ -450,9 +450,6 @@ class MiniCA:
             "Parse a certificate timestamp string."
             return calendar.timegm(email.utils.parsedate(text))
 
-        if filename is not None and input is not None:
-            raise RuntimeError('_get_cert_name() got redundant file '
-                               'name and data')
         cmdline = (
             # Parse certificate.
             'x509',
@@ -463,12 +460,11 @@ class MiniCA:
             # Print out the subject and issuer.
             '-subject', '-issuer',
             # ...As well as the notBefore and notAfter dates.
-            '-dates'
-        )
-        if filename is not None:
+            '-dates',
             # Read input from the given file.
-            cmdline += ('-in', filename)
-        res = self._run_openssl(cmdline, input, override_dry_run=True)
+            '-in', filename
+        )
+        res = self._run_openssl(cmdline, override_dry_run=True)
         raw_data = {}
         for line in res['stdout'].split('\n'):
             if not line: continue
@@ -489,7 +485,7 @@ class MiniCA:
         while 1:
             cur_path = self._derive_paths(cur_basename)[0]
             output.append((cur_basename, cur_path))
-            cur_parent = self._get_cert_meta(filename=cur_path)['issuer'][1]
+            cur_parent = self._get_cert_meta(cur_path)['issuer'][1]
             if cur_parent == cur_basename: break
             cur_basename = cur_parent
         return output
@@ -609,8 +605,7 @@ class MiniCA:
             entry = [basename]
             result.append(entry)
             if not verbose: continue
-            details = self._get_cert_meta(
-                filename=os.path.join(cert_dir, fullname))
+            details = self._get_cert_meta(os.path.join(cert_dir, fullname))
             if details['subject'][1] != basename:
                 warnings.append('{}: Basename in certificate ({}) does not '
                                 'match file name'
