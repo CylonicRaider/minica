@@ -85,10 +85,10 @@ def parse_rdn(text):
     """
     Parse an RDN (Relative Distinguished Name) into a list of type-name pairs.
 
-    This expects text to be formatted as done by default by openssl-x509, i.e.
+    This expects text in the following format:
         /TYPE1=name1/TYPE2=name2/TYPE3=name3/...
     Whitespace is significant. Multi-valued RDNs are not supported. The parse
-    result is returned.
+    result is returned as a sequence of (TYPE, name) pairs.
     """
     items = text.split('/')
     if not items or items[0]:
