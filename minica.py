@@ -230,6 +230,12 @@ class OSAccess:
         else:
             return '/dev/fd/{}'.format(fp.name)
 
+    def _dryrun_log(self, *argv):
+        """
+        Print a shell command with the given parameters to the dry-run log.
+        """
+        print(format_shell_line(*args))
+
     def run_process(self, argv, input=None, override_dry_run=False):
         """
         Run the given external program with the given input.
@@ -246,7 +252,7 @@ class OSAccess:
         stderr: The process' standard error as a (Unicode) string.
         """
         if self.dry_run:
-            print(format_shell_line(*argv))
+            self._dryrun_log(*argv)
             if not override_dry_run:
                 return {'status': 0, 'stdout': '', 'stderr': ''}
 
@@ -279,14 +285,14 @@ class OSAccess:
         if self.dry_run:
             dest_desc = self._describe_file(destination)
             if len(source) == 0:
-                print(format_shell_line('touch', '--', dest_desc))
+                self._dryrun_log('touch', '--', dest_desc)
             elif len(source) == 1:
-                print(format_shell_line('cp', '--',
-                    self._describe_file(source[0]), dest_desc))
+                self._dryrun_log('cp', '--',
+                    self._describe_file(source[0]), dest_desc)
             else:
-                print(format_shell_line(*(('cat', '--') +
-                    tuple(self._describe_file(item) for item in source) +
-                    (ShellMarkup('>'), dest_desc))))
+                self._dryrun_log('cat', '--',
+                    *(self._describe_file(item) for item in source),
+                    ShellMarkup('>'), dest_desc)
             if adjust_dest is not None:
                 self.set_file_status(destination, **adjust_dest)
             return
@@ -324,15 +330,15 @@ class OSAccess:
         if self.dry_run:
             fp_desc = self._describe_file(fp)
             if mode is not None:
-                print(format_shell_line('chmod', '{:04o}'.format(mode),
-                                        '--', fp_desc))
+                self._dryrun_log('chmod', '{:04o}'.format(mode),
+                                 '--', fp_desc)
             if owner is not None and group is not None:
-                print(format_shell_line('chown', '{}:{}'.format(owner, group),
-                                        '--', fp_desc))
+                self._dryrun_log('chown', '{}:{}'.format(owner, group),
+                                 '--', fp_desc)
             elif owner is not None:
-                print(format_shell_line('chown', owner, '--', fp_desc))
+                self._dryrun_log('chown', owner, '--', fp_desc)
             elif group is not None:
-                print(format_shell_line('chgrp', group, '--', fp_desc))
+                self._dryrun_log('chgrp', group, '--', fp_desc)
             return
 
         with contextlib.ExitStack() as stack:
@@ -353,7 +359,7 @@ class OSAccess:
         path is a string denoting the location of the file to be removed.
         """
         if self.dry_run:
-            print(format_shell_line('rm', '-f', '--', path))
+            self._dryrun_log('rm', '-f', '--', path)
             return
 
         try:
