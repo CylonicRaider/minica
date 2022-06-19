@@ -230,11 +230,12 @@ class OSAccess:
         else:
             return '/dev/fd/{}'.format(fp.name)
 
-    def _dryrun_log(self, *argv):
+    def _dryrun_log(self, *argv, files=(), suffix=()):
         """
         Print a shell command with the given parameters to the dry-run log.
         """
-        print(format_shell_line(*args))
+        separator = ('--',) if any(f.startswith('-') for f in files) else ()
+        print(format_shell_line(*argv, *separator, *files, *suffix))
 
     def run_process(self, argv, input=None, override_dry_run=False):
         """
@@ -285,14 +286,15 @@ class OSAccess:
         if self.dry_run:
             dest_desc = self._describe_file(destination)
             if len(source) == 0:
-                self._dryrun_log('touch', '--', dest_desc)
+                self._dryrun_log('touch', files=(dest_desc,))
             elif len(source) == 1:
-                self._dryrun_log('cp', '--',
-                    self._describe_file(source[0]), dest_desc)
+                self._dryrun_log('cp', files=(self._describe_file(source[0]),
+                                              dest_desc))
             else:
-                self._dryrun_log('cat', '--',
-                    *(self._describe_file(item) for item in source),
-                    ShellMarkup('>'), dest_desc)
+                self._dryrun_log('cat',
+                                 files=tuple(self._describe_file(item)
+                                             for item in source),
+                                 suffix=(ShellMarkup('>'), dest_desc))
             if adjust_dest is not None:
                 self.set_file_status(destination, **adjust_dest)
             return
@@ -331,14 +333,14 @@ class OSAccess:
             fp_desc = self._describe_file(fp)
             if mode is not None:
                 self._dryrun_log('chmod', '{:04o}'.format(mode),
-                                 '--', fp_desc)
+                                 files=(fp_desc,))
             if owner is not None and group is not None:
                 self._dryrun_log('chown', '{}:{}'.format(owner, group),
-                                 '--', fp_desc)
+                                 files=(fp_desc,))
             elif owner is not None:
-                self._dryrun_log('chown', owner, '--', fp_desc)
+                self._dryrun_log('chown', owner, files=(fp_desc,))
             elif group is not None:
-                self._dryrun_log('chgrp', group, '--', fp_desc)
+                self._dryrun_log('chgrp', group, files=(fp_desc,))
             return
 
         with contextlib.ExitStack() as stack:
@@ -359,7 +361,7 @@ class OSAccess:
         path is a string denoting the location of the file to be removed.
         """
         if self.dry_run:
-            self._dryrun_log('rm', '-f', '--', path)
+            self._dryrun_log('rm', '-f', files=(path,))
             return
 
         try:
