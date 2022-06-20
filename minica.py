@@ -585,7 +585,7 @@ class MiniCA:
         except PermissionError:
             if not readonly: raise
 
-    def list(self, basenames=None, verbose=False):
+    def list(self, basenames=None, verbose=False, sort=True):
         """
         Return the names and metadata of the certificates with the given
         names.
@@ -595,6 +595,10 @@ class MiniCA:
 
         verbose indicates that listing entries should not only contain names
         but also metadata.
+
+        sort indicates if the listing of all certificates should be sorted.
+        If an explicit basename list is given, the listing is always in that
+        order.
         """
         def format_timestamp(ts):
             "Format a timestamp into a human-readable string."
@@ -604,6 +608,8 @@ class MiniCA:
         if basenames is None:
             basenames = [n[:-4] for n in os.listdir(cert_dir)
                          if n.endswith('.pem')]
+            if sort:
+                basenames.sort()
         result, warnings = [], []
         for basename in basenames:
             fullname = self._derive_paths(basename)[0]
