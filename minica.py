@@ -655,11 +655,11 @@ class MiniCA:
             # Use the configured validity interval.
             '-days', str(self.new_cert_days),
             # Write certificate and key to files.
-            '-out', cert_path, '-keyout', key_path
+            '-out', cert_path, '-keyout', key_path,
+            # Propagate the CA setting.
+            '-addext', 'basicConstraints=critical,CA:' +
+                ('true' if ca else 'false')
         )
-        if not ca:
-            # The secion name is mentioned in the openssl-cmp documentation.
-            cert_options += ('-extensions', 'v3_ca')
         options += self._encode_extensions(exts)
         return self._create_cert(options, cert_path, key_path)
 
@@ -687,7 +687,10 @@ class MiniCA:
                     (UNIT_INTERMEDIATE if ca else UNIT_LEAF), new_basename),
                 # Write the key to its final location but the request to
                 # standard output.
-                '-keyout', new_key_path
+                '-keyout', new_key_path,
+                # Propagate the CA setting.
+                '-addext', 'basicConstraints=critical,CA:' +
+                    ('true' if ca else 'false')
             ) + self._encode_extensions(exts))
             cert_options = (
                 # Sign a certificate request.
@@ -699,12 +702,10 @@ class MiniCA:
                 # Use the given CA.
                 '-CA', par_cert_path, '-CAkey', par_key_path,
                 # Output the finished certificate to the correct location.
-                '-out', new_cert_path
+                '-out', new_cert_path,
+                # Trust the extensions of the CSR we just produced.
+                '-copy_extensions', 'copyall'
             )
-            if ca:
-                # The secion name is mentioned in the openssl-ca
-                # documentation.
-                cert_options += ('-extensions', 'v3_ca')
             ret = self._create_cert(cert_options, new_cert_path, new_key_path,
                                     res_request['stdout'])
             success = True
