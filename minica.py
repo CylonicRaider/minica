@@ -803,6 +803,22 @@ class MiniCA:
                 if key_written: self._silent_remove(key_dest)
         return ret
 
+    def show(self, basename):
+        """
+        Print a text dump of the given certificate to standard output.
+        """
+        cert_path, key_path = self._derive_paths(basename)
+        res = self._run_openssl((
+            # Certificate processing.
+            'x509',
+            # Read the given certificate.
+            '-in', cert_path,
+            # Convert to plain text instead of base64 gibberish.
+            '-noout', '-text'
+        ))
+        print(res['stdout'], end='')
+        return {'status': 'OK'}
+
 def days_in(s):
     "Helper: Parse a --days command-line argument value."
     try:
