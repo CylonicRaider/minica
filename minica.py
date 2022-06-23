@@ -995,6 +995,12 @@ def main():
              'Either may be the empty string to perform no change.')
     p_export.add_argument('name', nargs='+',
         help='The name of a certificate to export.')
+    # (Subcommand show.)
+    p_show = sp.add_parser('show',
+        help='Display the contents of the given certificate in '
+             'human-readable format.')
+    p_show.add_argument('name',
+        help='The name of the certificate to display.')
     # Parse command line.
     arguments = p.parse_args()
     # Create driver object.
@@ -1041,6 +1047,8 @@ def main():
                     'certificates with --output.')
             for basename in arguments.name:
                 do_export(basename)
+        elif arguments.action == 'show':
+            ca.show(arguments.name)
         else:
             raise AssertionError('This should not happen?!')
     except Error as err:
