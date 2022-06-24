@@ -808,6 +808,9 @@ class MiniCA:
         Print a text dump of the given certificate to standard output.
         """
         cert_path, key_path = self._derive_paths(basename)
+        if not os.path.exists(cert_path):
+            raise InputError('Certificate {} does not exist'
+                             .format(basename))
         res = self._run_openssl((
             # Certificate processing.
             'x509',
