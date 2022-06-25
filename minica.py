@@ -429,13 +429,17 @@ class MiniCA:
             return
         self.os.remove_file(path)
 
-    def _derive_paths(self, basename, detail=None):
+    def _derive_paths(self, basename, detail=None, must_exist=False):
         "Internal: Calculate certificate and private key paths."
         if not VALID_NAME.match(basename):
             raise ValidationError('Invalid {}certificate basename'
                                   .format(detail + ' ' if detail else ''))
-        return (os.path.join(self.storage_dir, 'cert', basename + '.pem'),
-                os.path.join(self.storage_dir, 'key', basename + '.pem'))
+        ret = (os.path.join(self.storage_dir, 'cert', basename + '.pem'),
+               os.path.join(self.storage_dir, 'key', basename + '.pem'))
+        if must_exist and not os.path.exists(ret[0]):
+            raise InputError('Certificate {} does not exist'
+                              .format(basename))
+        return ret
 
     def _get_cert_meta(self, filename):
         "Internal: Retrieve and parse the metadata of the named certificate."
@@ -612,10 +616,7 @@ class MiniCA:
                 basenames.sort()
         result, warnings = [], []
         for basename in basenames:
-            fullname = self._derive_paths(basename)[0]
-            if not os.path.exists(fullname):
-                raise InputError('Certificate {} does not exist'
-                                 .format(basename))
+            fullname = self._derive_paths(basename, must_exist=True)[0]
             entry = [basename]
             result.append(entry)
             if not verbose: continue
@@ -807,10 +808,7 @@ class MiniCA:
         """
         Print a text dump of the given certificate to standard output.
         """
-        cert_path, key_path = self._derive_paths(basename)
-        if not os.path.exists(cert_path):
-            raise InputError('Certificate {} does not exist'
-                             .format(basename))
+        cert_path, key_path = self._derive_paths(basename, must_exist=True)
         res = self._run_openssl((
             # Certificate processing.
             'x509',
