@@ -817,7 +817,7 @@ class MiniCA:
             # Convert to plain text instead of base64 gibberish.
             '-noout', '-text'
         ))
-        print(res['stdout'], end='')
+        print('# {}.pem:\n{}'.format(basename, res['stdout']), end='')
         return {'status': 'OK'}
 
 def days_in(s):
