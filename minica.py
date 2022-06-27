@@ -1000,7 +1000,7 @@ def main():
     p_show = sp.add_parser('show',
         help='Display the contents of the given certificate in '
              'human-readable format.')
-    p_show.add_argument('name',
+    p_show.add_argument('name', nargs='+',
         help='The name of the certificate to display.')
     # Parse command line.
     arguments = p.parse_args()
@@ -1049,7 +1049,8 @@ def main():
             for basename in arguments.name:
                 do_export(basename)
         elif arguments.action == 'show':
-            ca.show(arguments.name)
+            for basename in arguments.name:
+                ca.show(basename)
         else:
             raise AssertionError('This should not happen?!')
     except Error as err:
