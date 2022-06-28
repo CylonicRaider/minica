@@ -1049,7 +1049,8 @@ def main():
             for basename in arguments.name:
                 do_export(basename)
         elif arguments.action == 'show':
-            for basename in arguments.name:
+            for i, basename in enumerate(arguments.name):
+                if i: print()
                 ca.show(basename)
         else:
             raise AssertionError('This should not happen?!')
