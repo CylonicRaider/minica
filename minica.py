@@ -932,12 +932,14 @@ def main():
     sp = p.add_subparsers(dest='action',
         description='The action to perform.')
     sp.required = True
+
     # (Subcommand init.)
     p_init = sp.add_parser('init',
         help='Initialize the certificate store (and do nothing else).')
     p_init.add_argument('--force', '-f', action='store_true',
         help='Replace configuration files that may have been modified to '
              'pristine copies.')
+
     # (Subcommand list.)
     p_list = sp.add_parser('list',
         help='Display certificates.')
@@ -946,6 +948,7 @@ def main():
              'its name).')
     p_list.add_argument('name', nargs='*',
         help='The name of a certificate to display (defaults to all).')
+
     # (Subcommand new.)
     p_new = sp.add_parser('new',
         help='Create a new intermediate or leaf certificate.')
@@ -962,11 +965,13 @@ def main():
              'one.')
     p_new.add_argument('name',
         help='The name of the new certificate.')
+
     # (Subcommand remove.)
     p_remove = sp.add_parser('remove',
         help='Delete one or more certificates.')
     p_remove.add_argument('name', nargs='+',
         help='The name of a certificate to delete.')
+
     # (Subcommand export.)
     p_export = sp.add_parser('export',
         help='Copy files associated with one or more certificates from the '
@@ -996,14 +1001,17 @@ def main():
              'Either may be the empty string to perform no change.')
     p_export.add_argument('name', nargs='+',
         help='The name of a certificate to export.')
+
     # (Subcommand show.)
     p_show = sp.add_parser('show',
         help='Display the contents of the given certificate in '
              'human-readable format.')
     p_show.add_argument('name', nargs='+',
         help='The name of the certificate to display.')
+
     # Parse command line.
     arguments = p.parse_args()
+
     # Create driver object.
     kwargs = {
         'openssl_path': arguments.openssl,
@@ -1019,19 +1027,23 @@ def main():
             new_cert_days=arguments.days
         )
     ca = MiniCA(**kwargs)
+
     # Execute action.
     try:
         prepare_force = getattr(arguments, 'force', False)
         prepare_ro = (arguments.action not in ('init', 'new', 'remove'))
         ca.prepare_storage(prepare_force, prepare_ro)
+
         if arguments.action == 'init':
             pass
+
         elif arguments.action == 'list':
             res = ca.list(arguments.name or None, verbose=arguments.long)
             fmt, rows = layout_listing(res['result'])
             for row in rows:
                 print(fmt.format(*row).rstrip())
             print_warnings(res['warnings'])
+
         elif arguments.action == 'new':
             if arguments.ca is None:
                 ca_cert = (arguments.parent is None)
@@ -1039,19 +1051,23 @@ def main():
                 ca_cert = arguments.ca
             ca.create(arguments.name, arguments.parent, ca_cert,
                       exts=get_exts(arguments))
+
         elif arguments.action == 'remove':
             for basename in arguments.name:
                 ca.remove(basename)
+
         elif arguments.action == 'export':
             if len(arguments.name) > 1 and arguments.output is not None:
                 raise SystemExit('ERROR: May not export multiple '
                     'certificates with --output.')
             for basename in arguments.name:
                 do_export(basename)
+
         elif arguments.action == 'show':
             for i, basename in enumerate(arguments.name):
                 if i: print()
                 ca.show(basename)
+
         else:
             raise AssertionError('This should not happen?!')
     except Error as err:
