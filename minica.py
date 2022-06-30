@@ -804,18 +804,29 @@ class MiniCA:
                 if key_written: self._silent_remove(key_dest)
         return ret
 
-    def show(self, basename):
+    def show(self, basename, fmt='text'):
         """
         Print a text dump of the given certificate to standard output.
+
+        basename is the name of the certificate to display.
+        fmt      is a string defining how to format the display. It can be one
+                 of 'text' (for human-readable display) or 'pem' (for
+                 PEM-encoded certificate data).
         """
         cert_path, key_path = self._derive_paths(basename, must_exist=True)
+        if fmt == 'text':
+            # Convert to plain text instead of base64 gibberish.
+            fmt_args = ('-noout', '-text')
+        else:
+            # Keep the base64 gibberish.
+            fmt_args = ()
         res = self._run_openssl((
             # Certificate processing.
             'x509',
             # Read the given certificate.
             '-in', cert_path,
-            # Convert to plain text instead of base64 gibberish.
-            '-noout', '-text'
+            # Apply the selected formatting arguments.
+            *fmt_args
         ))
         print('# {}.pem:\n{}'.format(basename, res['stdout']), end='')
         return {'status': 'OK'}
