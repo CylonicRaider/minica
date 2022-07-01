@@ -1015,10 +1015,14 @@ def main():
 
     # (Subcommand show.)
     p_show = sp.add_parser('show',
-        help='Display the contents of the given certificate in '
+        help='Display the contents of the given certificate(s) in '
              'human-readable format.')
+    p_show.add_argument('--format', '-F', metavar='FORMAT',
+        choices=('text', 'pem'), default='text',
+        help='How to display the certificates (one of "text" (the default) '
+             'or "pem").')
     p_show.add_argument('name', nargs='+',
-        help='The name of the certificate to display.')
+        help='The name of a certificate to display.')
 
     # Parse command line.
     arguments = p.parse_args()
@@ -1077,7 +1081,7 @@ def main():
         elif arguments.action == 'show':
             for i, basename in enumerate(arguments.name):
                 if i: print()
-                ca.show(basename)
+                ca.show(basename, fmt=arguments.format)
 
         else:
             raise AssertionError('This should not happen?!')
