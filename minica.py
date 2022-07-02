@@ -804,7 +804,7 @@ class MiniCA:
                 if key_written: self._silent_remove(key_dest)
         return ret
 
-    def show(self, basename, fmt='text'):
+    def show(self, basename, fmt='text', output=None):
         """
         Print a text dump of the given certificate to standard output.
 
@@ -812,7 +812,9 @@ class MiniCA:
         fmt      is a string defining how to format the display. It can be one
                  of 'text' (for human-readable display) or 'pem' (for
                  PEM-encoded certificate data).
+        output   is a file to write to; it defaults to standard output.
         """
+        if output is None: output = sys.stdout
         cert_path, key_path = self._derive_paths(basename, must_exist=True)
         if fmt == 'text':
             # Convert to plain text instead of base64 gibberish.
@@ -828,7 +830,7 @@ class MiniCA:
             # Apply the selected formatting arguments.
             *fmt_args
         ))
-        print('# {}.pem:\n{}'.format(basename, res['stdout']), end='')
+        output.write('# {}.pem:\n{}'.format(basename, res['stdout']))
         return {'status': 'OK'}
 
 def days_in(s):
