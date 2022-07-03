@@ -829,7 +829,7 @@ class MiniCA:
             '-in', cert_path,
             # Apply the selected formatting arguments.
             *fmt_args
-        ))
+        ), override_dry_run=True)
         output.write('# {}.pem:\n{}'.format(basename, res['stdout']))
         return {'status': 'OK'}
 
