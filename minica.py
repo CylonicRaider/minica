@@ -205,17 +205,22 @@ def format_shell_line(*argv):
 
 class OSAccess:
     """
-    OSAccess(dry_run=False) -> new instance
+    OSAccess(dry_run=False, dry_run_output=None) -> new instance
 
     Central object for accessing various OS functions.
 
     If dry_run is true, no actual operations are performed, and equivalent
     shell commands are printed instead.
+
+    dry_run_output is a file to write dry-run reports to; it defaults to
+    standard output.
     """
 
-    def __init__(self, dry_run=False):
+    def __init__(self, dry_run=False, dry_run_output=None):
         "Instance initializer; see the class docstring for details."
+        if dry_run_output is None: dry_run_output = sys.stdout
         self.dry_run = dry_run
+        self.dry_run_output = dry_run_output
 
     def _describe_file(self, fp):
         "Internal: Return a dry-run logging name for the given file."
@@ -235,7 +240,8 @@ class OSAccess:
         Print a shell command with the given parameters to the dry-run log.
         """
         separator = ('--',) if any(f.startswith('-') for f in files) else ()
-        print(format_shell_line(*argv, *separator, *files, *suffix))
+        self.dry_run_output.write(format_shell_line(*argv, *separator, *files,
+                                                    *suffix) + '\n')
 
     def run_process(self, argv, input=None, override_dry_run=False):
         """
