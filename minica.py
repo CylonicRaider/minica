@@ -960,7 +960,7 @@ def main():
              'pristine copies.')
 
     # (Subcommand list.)
-    p_list = sp.add_parser('list',
+    p_list = sp.add_parser('list', aliases=('ls',),
         help='Display certificates.')
     p_list.add_argument('-l', '--long', action='store_true',
         help='Display additional information about each certificate (beyond '
@@ -986,7 +986,7 @@ def main():
         help='The name of the new certificate.')
 
     # (Subcommand remove.)
-    p_remove = sp.add_parser('remove',
+    p_remove = sp.add_parser('remove', aliases=('rm',),
         help='Delete one or more certificates.')
     p_remove.add_argument('name', nargs='+',
         help='The name of a certificate to delete.')
@@ -1022,7 +1022,7 @@ def main():
         help='The name of a certificate to export.')
 
     # (Subcommand show.)
-    p_show = sp.add_parser('show',
+    p_show = sp.add_parser('show', aliases=('cat',),
         help='Display the contents of the given certificate(s) in '
              'human-readable format.')
     p_show.add_argument('--format', '-F', metavar='FORMAT',
@@ -1060,7 +1060,7 @@ def main():
         if arguments.action == 'init':
             pass
 
-        elif arguments.action == 'list':
+        elif arguments.action in ('list', 'ls'):
             res = ca.list(arguments.name or None, verbose=arguments.long)
             fmt, rows = layout_listing(res['result'])
             for row in rows:
@@ -1075,7 +1075,7 @@ def main():
             ca.create(arguments.name, arguments.parent, ca_cert,
                       exts=get_exts(arguments))
 
-        elif arguments.action == 'remove':
+        elif arguments.action in ('remove', 'rm'):
             for basename in arguments.name:
                 ca.remove(basename)
 
@@ -1086,7 +1086,7 @@ def main():
             for basename in arguments.name:
                 do_export(basename)
 
-        elif arguments.action == 'show':
+        elif arguments.action in ('show', 'cat'):
             for i, basename in enumerate(arguments.name):
                 if i: print()
                 ca.show(basename, fmt=arguments.format)
