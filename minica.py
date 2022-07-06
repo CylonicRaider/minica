@@ -1026,9 +1026,9 @@ def main():
         help='Display the contents of the given certificate(s) in '
              'human-readable format.')
     p_show.add_argument('--format', '-F', metavar='FORMAT',
-        choices=('text', 'pem'), default='text',
-        help='How to display the certificates (one of "text" (the default) '
-             'or "pem").')
+        choices=('text', 'pem'),
+        help='How to display the certificates (one of "text" or "pem"; the '
+             'default is "text" for "show" and "pem" for "cat").')
     p_show.add_argument('name', nargs='+',
         help='The name of a certificate to display.')
 
@@ -1087,9 +1087,12 @@ def main():
                 do_export(basename)
 
         elif arguments.action in ('show', 'cat'):
+            fmt = arguments.format
+            if fmt is None:
+                fmt = 'text' if arguments.action == 'show' else 'pem'
             for i, basename in enumerate(arguments.name):
                 if i: print()
-                ca.show(basename, fmt=arguments.format)
+                ca.show(basename, fmt=fmt)
 
         else:
             raise AssertionError('This should not happen?!')
