@@ -948,7 +948,7 @@ def main():
         help='The location of the openssl executable.')
     p.add_argument('--dry-run', '-n', action='store_true',
         help='Print equivalent shell commands instead of doing things.')
-    sp = p.add_subparsers(dest='action',
+    sp = p.add_subparsers(metavar='<SUBCOMMAND>', dest='action',
         description='The action to perform.')
     sp.required = True
 
